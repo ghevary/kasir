@@ -52,7 +52,7 @@ router.get(
 // GET /api/reports/financial
 router.get(
   "/financial",
-  rbacMiddleware("admin"),
+  rbacMiddleware("admin", "kasir"),
   async (req: Request, res: Response) => {
     try {
       const { from, to } = req.query;

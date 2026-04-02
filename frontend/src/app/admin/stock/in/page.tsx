@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Package } from "lucide-react";
+import { Package, Save } from "lucide-react";
 import { MenuItem } from "@/types";
 
 export default function AdminStockInPage() {
@@ -86,7 +86,7 @@ export default function AdminStockInPage() {
           )}
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => { setForm({ menuItemId: "", qty: "", supplier: "", purchasePrice: "", notes: "" }); setSelectedItem(null); }} className="flex-1 cursor-pointer">Batal</Button>
-            <Button onClick={handleSubmit} className="flex-1 bg-primary cursor-pointer">💾 Simpan Barang Masuk</Button>
+            <Button onClick={handleSubmit} className="flex-1 bg-primary cursor-pointer gap-1"><Save className="w-4 h-4" /> Simpan Barang Masuk</Button>
           </div>
         </CardContent>
       </Card>

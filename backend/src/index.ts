@@ -33,8 +33,6 @@ app.get("/api/health", (req, res) => {
 // Public routes
 app.use("/api/auth", authRoutes);
 
-// Midtrans webhook (no auth required)
-app.post("/api/transactions/midtrans-webhook", transactionsRoutes);
 
 // Protected routes (require authentication)
 app.use("/api/categories", authMiddleware, menuRoutes);

@@ -111,6 +111,10 @@ class ApiClient {
     });
   }
 
+  async deleteMenuItem(id: string) {
+    return this.request<any>(`/api/menu-items/${id}`, { method: "DELETE" });
+  }
+
   // Stock
   async getStockMonitor() {
     return this.request<any[]>("/api/stock/monitor");

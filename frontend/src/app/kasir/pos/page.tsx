@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,26 @@ import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
 import { MenuItem, CartItem, Shift } from "@/types";
 import { toast } from "sonner";
-import { Unlock, Image as ImageIcon, Utensils, ShoppingCart, Banknote, Smartphone, Trash2, CheckCircle } from "lucide-react";
+import {
+  Unlock,
+  Image as ImageIcon,
+  Utensils,
+  ShoppingCart,
+  Banknote,
+  Smartphone,
+  Trash2,
+  CheckCircle,
+  Printer,
+  X,
+  Search,
+} from "lucide-react";
+
+interface ReceiptData {
+  transaction: any;
+  items: any[];
+  changeAmount: number;
+  paidAmount: number;
+}
 
 export default function KasirPOS() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -23,6 +42,8 @@ export default function KasirPOS() {
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadData();
@@ -77,10 +98,6 @@ export default function KasirPOS() {
     );
   };
 
-  const removeFromCart = (itemId: string) => {
-    setCart((prev) => prev.filter((c) => c.menuItem.id !== itemId));
-  };
-
   const subtotal = cart.reduce(
     (sum, c) => sum + parseFloat(c.menuItem.price) * c.qty,
     0
@@ -111,11 +128,13 @@ export default function KasirPOS() {
 
       toast.success("Transaksi berhasil!");
 
-      // If QRIS with Midtrans token, open Snap popup
-      if (result.midtransToken && typeof window !== "undefined") {
-        // @ts-ignore
-        window.snap?.pay(result.midtransToken);
-      }
+      // Show receipt
+      setReceipt({
+        transaction: result.transaction,
+        items: result.items,
+        changeAmount: paymentMethod === "cash" ? changeAmount : 0,
+        paidAmount: paymentMethod === "cash" ? parseFloat(paidAmount || "0") : subtotal,
+      });
 
       // Reset form
       setCart([]);
@@ -127,6 +146,40 @@ export default function KasirPOS() {
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handlePrintReceipt = () => {
+    if (!receiptRef.current) return;
+    const printWindow = window.open("", "_blank", "width=320,height=600");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Struk Pembayaran</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Courier New', monospace; font-size: 12px; width: 280px; padding: 10px; color: #000; }
+          .center { text-align: center; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 8px 0; }
+          .row { display: flex; justify-content: space-between; margin: 2px 0; }
+          .item-name { margin: 4px 0 0 0; font-weight: 600; }
+          .item-detail { display: flex; justify-content: space-between; color: #555; font-size: 11px; }
+          h2 { font-size: 16px; margin-bottom: 4px; }
+          .footer { margin-top: 12px; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        ${receiptRef.current.innerHTML}
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        <\/script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const formatRupiah = (amount: number) =>
@@ -179,17 +232,121 @@ export default function KasirPOS() {
     );
   }
 
+  // Receipt Modal
+  if (receipt) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm border-border/50 bg-card shadow-2xl">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-lg">Struk Pembayaran</CardTitle>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setReceipt(null)}
+              className="cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Printable receipt content */}
+            <div ref={receiptRef} className="text-sm space-y-2">
+              <div className="text-center">
+                <h2 className="font-bold text-base">POS System</h2>
+                <p className="text-muted-foreground text-xs">Struk Pembayaran</p>
+              </div>
+
+              <div className="border-t border-dashed border-border my-2" />
+
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Tanggal</span>
+                <span>{new Date(receipt.transaction.createdAt).toLocaleString("id-ID")}</span>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Pelanggan</span>
+                <span>{receipt.transaction.customerName}</span>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Metode</span>
+                <span className="uppercase font-semibold">{receipt.transaction.paymentMethod}</span>
+              </div>
+
+              <div className="border-t border-dashed border-border my-2" />
+
+              {receipt.items.map((item: any, i: number) => (
+                <div key={i}>
+                  <p className="font-medium">{item.name}</p>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{item.qty} x {formatRupiah(parseFloat(item.unitPrice))}</span>
+                    <span>{formatRupiah(parseFloat(item.subtotal))}</span>
+                  </div>
+                </div>
+              ))}
+
+              <div className="border-t border-dashed border-border my-2" />
+
+              <div className="flex justify-between font-bold">
+                <span>Total</span>
+                <span className="text-primary">{formatRupiah(parseFloat(receipt.transaction.totalAmount))}</span>
+              </div>
+
+              {receipt.transaction.paymentMethod === "cash" && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span>Bayar</span>
+                    <span>{formatRupiah(receipt.paidAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Kembalian</span>
+                    <span className="text-emerald-400 font-semibold">{formatRupiah(receipt.changeAmount)}</span>
+                  </div>
+                </>
+              )}
+
+              <div className="border-t border-dashed border-border my-2" />
+
+              <div className="text-center text-xs text-muted-foreground mt-3">
+                <p>Terima kasih atas kunjungan Anda!</p>
+                <p className="mt-1">— POS System —</p>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setReceipt(null)}
+                className="flex-1 cursor-pointer"
+              >
+                <X className="w-4 h-4 mr-1" /> Tutup
+              </Button>
+              <Button
+                onClick={handlePrintReceipt}
+                className="flex-1 bg-primary cursor-pointer"
+              >
+                <Printer className="w-4 h-4 mr-1" /> Cetak Struk
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex gap-6 h-[calc(100vh-6rem)]">
       {/* Left: Menu Catalog */}
       <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
         <div className="flex items-center gap-4">
-          <Input
-            placeholder="🔍 Cari menu..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 h-11 bg-card/50 border-border/50"
-          />
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Cari menu..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-11 bg-card/50 border-border/50"
+            />
+          </div>
           <Input
             placeholder="Nama Pembeli"
             value={customerName}
@@ -202,7 +359,7 @@ export default function KasirPOS() {
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setSelectedCategory(null)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
               !selectedCategory
                 ? "bg-primary text-primary-foreground"
                 : "bg-card/50 text-muted-foreground hover:bg-accent/50"
@@ -214,7 +371,7 @@ export default function KasirPOS() {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
                 selectedCategory === cat.id
                   ? "bg-primary text-primary-foreground"
                   : "bg-card/50 text-muted-foreground hover:bg-accent/50"
@@ -292,7 +449,7 @@ export default function KasirPOS() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => updateQty(cartItem.menuItem.id, -1)}
-                    className="w-7 h-7 rounded-md bg-accent/50 flex items-center justify-center text-sm hover:bg-accent transition-colors"
+                    className="w-7 h-7 rounded-md bg-accent/50 flex items-center justify-center text-sm hover:bg-accent transition-colors cursor-pointer"
                   >
                     −
                   </button>
@@ -301,7 +458,7 @@ export default function KasirPOS() {
                   </span>
                   <button
                     onClick={() => updateQty(cartItem.menuItem.id, 1)}
-                    className="w-7 h-7 rounded-md bg-accent/50 flex items-center justify-center text-sm hover:bg-accent transition-colors"
+                    className="w-7 h-7 rounded-md bg-accent/50 flex items-center justify-center text-sm hover:bg-accent transition-colors cursor-pointer"
                   >
                     +
                   </button>
@@ -327,7 +484,7 @@ export default function KasirPOS() {
           <div className="flex gap-2">
             <button
               onClick={() => setPaymentMethod("cash")}
-              className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                 paymentMethod === "cash"
                   ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                   : "bg-card border border-border/50 text-muted-foreground hover:bg-accent/50"
@@ -337,7 +494,7 @@ export default function KasirPOS() {
             </button>
             <button
               onClick={() => setPaymentMethod("qris")}
-              className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                 paymentMethod === "qris"
                   ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
                   : "bg-card border border-border/50 text-muted-foreground hover:bg-accent/50"
@@ -364,6 +521,13 @@ export default function KasirPOS() {
                   </span>
                 </div>
               )}
+            </div>
+          )}
+
+          {paymentMethod === "qris" && (
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-center">
+              <Smartphone className="w-6 h-6 mx-auto text-blue-400 mb-1" />
+              <p className="text-xs text-blue-300">Pembayaran QRIS akan dicatat secara manual</p>
             </div>
           )}
 

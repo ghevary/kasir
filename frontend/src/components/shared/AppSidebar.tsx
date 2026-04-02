@@ -64,13 +64,11 @@ const adminNav: NavItem[] = [
     icon: <FileText className="w-5 h-5" />,
     href: "/admin/reports",
     children: [
-      { label: "Penjualan", href: "/admin/reports/sales" },
-      { label: "Keuangan", href: "/admin/reports/financial" },
+      { label: "Penjualan & Keuangan", href: "/admin/reports/sales" },
       { label: "Stok Masuk", href: "/admin/reports/stock-in" },
       { label: "Stok Keluar", href: "/admin/reports/stock-out" },
     ],
   },
-  { label: "Users", icon: <UsersIcon className="w-5 h-5" />, href: "/admin/users" },
 ];
 
 const kasirNav: NavItem[] = [

@@ -8,11 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { MenuItem } from "@/types";
+import { Pencil, Trash2, Plus, Save, X, Utensils } from "lucide-react";
 
 export default function AdminMenuItemsPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", categoryId: "", price: "", stockQty: "0", description: "" });
   const [loading, setLoading] = useState(true);
 
@@ -25,14 +27,51 @@ export default function AdminMenuItemsPage() {
     } catch {} finally { setLoading(false); }
   };
 
+  const resetForm = () => {
+    setForm({ name: "", categoryId: "", price: "", stockQty: "0", description: "" });
+    setEditingId(null);
+    setShowForm(false);
+  };
+
   const handleCreate = async () => {
     if (!form.name || !form.price) return toast.error("Nama dan harga wajib diisi");
     try {
       await api.createMenuItem({
         ...form, price: form.price, stockQty: parseInt(form.stockQty),
       });
-      toast.success("Menu ditambahkan!"); setShowForm(false);
-      setForm({ name: "", categoryId: "", price: "", stockQty: "0", description: "" }); load();
+      toast.success("Menu ditambahkan!");
+      resetForm(); load();
+    } catch (err: any) { toast.error(err.message); }
+  };
+
+  const handleEdit = (item: MenuItem) => {
+    setEditingId(item.id);
+    setForm({
+      name: item.name,
+      categoryId: item.categoryId || "",
+      price: String(item.price),
+      stockQty: String(item.stockQty),
+      description: item.description || "",
+    });
+    setShowForm(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingId || !form.name || !form.price) return toast.error("Nama dan harga wajib diisi");
+    try {
+      await api.updateMenuItem(editingId, {
+        ...form, price: form.price, stockQty: parseInt(form.stockQty),
+      });
+      toast.success("Menu diperbarui!");
+      resetForm(); load();
+    } catch (err: any) { toast.error(err.message); }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteMenuItem(id);
+      toast.info("Menu dinonaktifkan");
+      load();
     } catch (err: any) { toast.error(err.message); }
   };
 
@@ -44,26 +83,33 @@ export default function AdminMenuItemsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Menu Items</h1>
-        <Button onClick={() => setShowForm(!showForm)} className="bg-primary cursor-pointer">
-          {showForm ? "Batal" : "+ Tambah Menu"}
+        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Utensils className="w-6 h-6" /> Menu Items</h1>
+        <Button onClick={() => { if (showForm && !editingId) { resetForm(); } else { resetForm(); setShowForm(true); } }} className="bg-primary cursor-pointer gap-1">
+          {showForm && !editingId ? <><X className="w-4 h-4" /> Batal</> : <><Plus className="w-4 h-4" /> Tambah Menu</>}
         </Button>
       </div>
 
       {showForm && (
         <Card className="border-border/50">
-          <CardHeader><CardTitle className="text-lg">Tambah Menu Baru</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">{editingId ? "Edit Menu" : "Tambah Menu Baru"}</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <Input placeholder="Nama Menu *" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} className="bg-background/50" />
             <select value={form.categoryId} onChange={(e) => setForm({...form, categoryId: e.target.value})} className="h-10 px-3 rounded-lg bg-background/50 border border-border/50 text-sm">
               <option value="">Pilih Kategori</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {categories.filter(c => c.isActive).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <Input placeholder="Harga *" type="number" value={form.price} onChange={(e) => setForm({...form, price: e.target.value})} className="bg-background/50" />
-            <Input placeholder="Stok Awal" type="number" value={form.stockQty} onChange={(e) => setForm({...form, stockQty: e.target.value})} className="bg-background/50" />
+            <Input placeholder="Stok" type="number" value={form.stockQty} onChange={(e) => setForm({...form, stockQty: e.target.value})} className="bg-background/50" />
             <Input placeholder="Deskripsi" value={form.description} onChange={(e) => setForm({...form, description: e.target.value})} className="col-span-2 bg-background/50" />
-            <div className="col-span-2">
-              <Button onClick={handleCreate} className="w-full bg-primary cursor-pointer">💾 Simpan Menu</Button>
+            <div className="col-span-2 flex gap-3">
+              {editingId ? (
+                <>
+                  <Button onClick={handleUpdate} className="flex-1 bg-primary cursor-pointer gap-1"><Save className="w-4 h-4" /> Simpan Perubahan</Button>
+                  <Button variant="outline" onClick={resetForm} className="cursor-pointer gap-1"><X className="w-4 h-4" /> Batal</Button>
+                </>
+              ) : (
+                <Button onClick={handleCreate} className="w-full bg-primary cursor-pointer gap-1"><Save className="w-4 h-4" /> Simpan Menu</Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -78,6 +124,7 @@ export default function AdminMenuItemsPage() {
               <th className="text-right py-3 px-4 font-medium">Harga</th>
               <th className="text-center py-3 px-4 font-medium">Stok</th>
               <th className="text-center py-3 px-4 font-medium">Status</th>
+              <th className="text-center py-3 px-4 font-medium">Aksi</th>
             </tr></thead>
             <tbody>
               {items.map((item) => (
@@ -90,6 +137,20 @@ export default function AdminMenuItemsPage() {
                     <Badge className={item.isAvailable ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}>
                       {item.isAvailable ? "Aktif" : "Nonaktif"}
                     </Badge>
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      {item.isAvailable && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => handleEdit(item)} className="text-xs cursor-pointer gap-1">
+                            <Pencil className="w-3 h-3" /> Edit
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleDelete(item.id)} className="text-xs text-destructive cursor-pointer gap-1">
+                            <Trash2 className="w-3 h-3" /> Hapus
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
