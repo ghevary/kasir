@@ -47,7 +47,7 @@ router.post(
           qty,
           notes,
           supplier,
-          purchasePrice,
+          purchasePrice: purchasePrice === "" ? null : purchasePrice,
         })
         .returning();
 

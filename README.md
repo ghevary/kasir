@@ -1,3 +1,5 @@
+⚠️Sengaja .env ku upload biar gampang aja⚠️
+
 # 🛒 POS System (Aplikasi Kasir)
 
 Aplikasi kasir ini dibuat agar mudah digunakan. Anda hanya perlu mengikuti beberapa langkah di bawah ini untuk menyalakan, menggunakan, dan mematikan aplikasinya.
@@ -32,7 +34,7 @@ Aplikasi ini memiliki 3 jenis peran dengan tugas yang berbeda-beda. Berikut adal
 
 | Posisi / Role | Email | Password | Kegunaan |
 |-------------|-----------------|--------------|-----------------|
-| **Admin** | `admin@pos.com` | `admin123` | Mengatur semua data, tambah menu, cek laporan keuangan penuh. |
+| **Admin** | `` | `admin123` | Mengatur semua data, tambah menu, cek laporan keuangan penuh. |
 | **Kasir** | `kasir@pos.com` | `kasir123` | Melakukan penjualan, cetak struk, melihat rekap hariannya. |
 | **Gudang** | `gudang@pos.com`| `gudang123`| Mengatur masuk/keluarnya barang (stok) dapur/gudang. |
 

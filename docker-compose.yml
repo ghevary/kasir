@@ -38,10 +38,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-      - /app/dist
 
   frontend:
     build: ./frontend
@@ -52,10 +48,6 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
 
 volumes:
   postgres_data:
