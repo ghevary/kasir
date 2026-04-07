@@ -50,8 +50,8 @@ export default function LoginPage() {
           <CardContent className="p-8 space-y-8">
             {/* Logo */}
             <div className="text-center space-y-3">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-chart-1/60 flex items-center justify-center shadow-lg shadow-primary/25 animate-float text-primary-foreground">
-                <Store className="w-8 h-8" />
+              <div className="mx-auto flex items-center justify-center animate-float -my-4">
+                <img src="/mbg.svg" alt="Logo" className="w-32 h-32 object-contain" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">POS System</h1>

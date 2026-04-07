@@ -137,8 +137,8 @@ export function AppSidebar({ role }: { role: "admin" | "kasir" | "gudang" }) {
       {/* Header */}
       <div className="p-5 border-b border-border/50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20 animate-float text-primary-foreground">
-            <Store className="w-5 h-5" />
+          <div className="flex items-center justify-center animate-float -ml-2">
+            <img src="/mbg.svg" alt="Logo" className="w-24 h-24 object-contain" />
           </div>
           <div>
             <h1 className="font-bold text-sm tracking-tight">POS System</h1>
