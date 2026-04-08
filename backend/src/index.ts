@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { authMiddleware } from "./middleware/auth.middleware";
+import { setupDatabase } from "./db/setup";
 
 // Routes
 import authRoutes from "./routes/auth.routes";
@@ -49,8 +50,18 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(port, () => {
-  console.log(`🚀 POS System Backend running on port ${port}`);
-});
+// Run database setup (auto-migrate + seed) then start server
+setupDatabase()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`🚀 POS System Backend running on port ${port}`);
+    });
+  })
+  .catch((err) => {
+    console.error("❌ Failed to setup database, starting server anyway...", err);
+    app.listen(port, () => {
+      console.log(`🚀 POS System Backend running on port ${port} (DB setup failed)`);
+    });
+  });
 
 export default app;
