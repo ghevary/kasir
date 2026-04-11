@@ -95,7 +95,7 @@ router.get(
 // GET /api/reports/stock-in
 router.get(
   "/stock-in",
-  rbacMiddleware("admin"),
+  rbacMiddleware("admin", "gudang"),
   async (req: Request, res: Response) => {
     try {
       const result = await db
@@ -123,6 +123,43 @@ router.get(
       res.json(result);
     } catch (error) {
       console.error("Stock out report error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// GET /api/reports/stock-summary — overview of warehouse + outlet stock
+router.get(
+  "/stock-summary",
+  rbacMiddleware("admin", "gudang", "kasir"),
+  async (req: Request, res: Response) => {
+    try {
+      const result = await db
+        .select({
+          id: menuItems.id,
+          name: menuItems.name,
+          warehouseQty: menuItems.warehouseQty,
+          outletQty: menuItems.outletQty,
+          stockQty: menuItems.stockQty,
+          stockAlertThreshold: menuItems.stockAlertThreshold,
+        })
+        .from(menuItems)
+        .orderBy(menuItems.name);
+
+      const totalWarehouse = result.reduce((sum, i) => sum + (i.warehouseQty || 0), 0);
+      const totalOutlet = result.reduce((sum, i) => sum + (i.outletQty || 0), 0);
+
+      res.json({
+        items: result,
+        summary: {
+          totalItems: result.length,
+          totalWarehouse,
+          totalOutlet,
+          totalAll: totalWarehouse + totalOutlet,
+        },
+      });
+    } catch (error) {
+      console.error("Stock summary report error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   }

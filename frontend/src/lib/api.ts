@@ -235,6 +235,48 @@ class ApiClient {
   async getDailySalesReport() {
     return this.request<any[]>("/api/reports/daily-sales");
   }
+
+  async getStockSummary() {
+    return this.request<any>("/api/reports/stock-summary");
+  }
+
+  // Users
+  async getUsers() {
+    return this.request<any[]>("/api/users");
+  }
+
+  async createUser(data: { name: string; email: string; password: string; role: string }) {
+    return this.request<any>("/api/users", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateUser(id: string, data: any) {
+    return this.request<any>(`/api/users/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteUser(id: string) {
+    return this.request<any>(`/api/users/${id}`, { method: "DELETE" });
+  }
+
+  // Forecast
+  async getForecast(period?: number, days?: number) {
+    const params = new URLSearchParams();
+    if (period) params.set("period", period.toString());
+    if (days) params.set("days", days.toString());
+    return this.request<any>(`/api/forecast?${params}`);
+  }
+
+  async getForecastDetail(menuItemId: string, period?: number, days?: number) {
+    const params = new URLSearchParams();
+    if (period) params.set("period", period.toString());
+    if (days) params.set("days", days.toString());
+    return this.request<any>(`/api/forecast/${menuItemId}?${params}`);
+  }
 }
 
 export const api = new ApiClient(API_URL);

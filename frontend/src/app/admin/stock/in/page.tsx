@@ -44,7 +44,7 @@ export default function AdminStockInPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Package className="w-6 h-6" /> Input Barang Masuk</h1>
+      <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Package className="w-6 h-6" /> Input Barang Masuk (Gudang)</h1>
       <Card className="border-border/50">
         <CardContent className="p-6 space-y-4">
           <div className="space-y-2">
@@ -58,7 +58,7 @@ export default function AdminStockInPage() {
               className="w-full h-11 px-3 rounded-lg bg-background/50 border border-border/50 text-sm"
             >
               <option value="">-- Pilih Item --</option>
-              {items.map((i) => <option key={i.id} value={i.id}>{i.name} (Stok: {i.stockQty})</option>)}
+              {items.map((i) => <option key={i.id} value={i.id}>{i.name} (Gudang: {i.warehouseQty || 0})</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -81,7 +81,7 @@ export default function AdminStockInPage() {
           </div>
           {selectedItem && form.qty && (
             <div className="p-3 rounded-lg bg-accent/30 text-sm">
-              Stok saat ini: <b>{selectedItem.stockQty}</b> → Setelah input: <b className="text-primary">{selectedItem.stockQty + parseInt(form.qty || "0")}</b>
+              Stok gudang saat ini: <b>{selectedItem.warehouseQty || 0}</b> → Setelah input: <b className="text-primary">{(selectedItem.warehouseQty || 0) + parseInt(form.qty || "0")}</b>
             </div>
           )}
           <div className="flex gap-3">

@@ -388,9 +388,9 @@ export default function KasirPOS() {
             <button
               key={item.id}
               onClick={() => addToCart(item)}
-              disabled={item.stockQty <= 0}
+              disabled={(item.outletQty || 0) <= 0}
               className={`p-4 rounded-xl border text-left transition-all hover:scale-[1.02] active:scale-[0.98] ${
-                item.stockQty <= 0
+                (item.outletQty || 0) <= 0
                   ? "opacity-50 cursor-not-allowed border-border/30"
                   : "border-border/50 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 cursor-pointer bg-card/50"
               }`}
@@ -403,7 +403,7 @@ export default function KasirPOS() {
                 {formatRupiah(parseFloat(item.price))}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Stok: {item.stockQty}
+                Stok: {item.outletQty || 0}
               </p>
             </button>
           ))}

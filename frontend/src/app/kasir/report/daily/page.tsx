@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/api";
-import { BarChart } from "lucide-react";
+import { BarChart, Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function KasirDailyReportPage() {
   const [data, setData] = useState<any[]>([]);
@@ -43,11 +44,16 @@ export default function KasirDailyReportPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><BarChart className="w-6 h-6" /> Laporan Harian</h1>
-        <p className="text-muted-foreground mt-1">
-          Ringkasan penjualan per item hari ini ({new Date().toLocaleDateString("id-ID")})
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><BarChart className="w-6 h-6" /> Laporan Harian</h1>
+          <p className="text-muted-foreground mt-1">
+            Ringkasan penjualan per item hari ini ({new Date().toLocaleDateString("id-ID")})
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => window.print()} className="cursor-pointer print:hidden">
+          <Printer className="w-4 h-4 mr-1" /> Cetak
+        </Button>
       </div>
 
       {/* Summary */}

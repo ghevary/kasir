@@ -60,12 +60,18 @@ CREATE TABLE IF NOT EXISTS "menu_items" (
   "description" text,
   "price" numeric(12,2) NOT NULL,
   "stock_qty" integer DEFAULT 0,
+  "warehouse_qty" integer DEFAULT 0,
+  "outlet_qty" integer DEFAULT 0,
   "stock_alert_threshold" integer DEFAULT 5,
   "image_url" text,
   "is_available" boolean DEFAULT true,
   "created_at" timestamp DEFAULT now(),
   "updated_at" timestamp DEFAULT now()
 );
+
+-- Add new columns if table already exists (migration)
+ALTER TABLE "menu_items" ADD COLUMN IF NOT EXISTS "warehouse_qty" integer DEFAULT 0;
+ALTER TABLE "menu_items" ADD COLUMN IF NOT EXISTS "outlet_qty" integer DEFAULT 0;
 
 -- Shifts table
 CREATE TABLE IF NOT EXISTS "shifts" (
@@ -145,6 +151,9 @@ CREATE TABLE IF NOT EXISTS "stock_out" (
   "nota_number" text,
   "created_at" timestamp DEFAULT now()
 );
+
+-- Sync stock_qty = warehouse_qty + outlet_qty for any existing data
+UPDATE "menu_items" SET "warehouse_qty" = "stock_qty" WHERE "warehouse_qty" = 0 AND "stock_qty" > 0;
 `;
 
 const defaultUsers = [

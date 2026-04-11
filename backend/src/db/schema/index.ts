@@ -54,6 +54,8 @@ export const menuItems = pgTable("menu_items", {
   description: text("description"),
   price: decimal("price", { precision: 12, scale: 2 }).notNull(),
   stockQty: integer("stock_qty").default(0),
+  warehouseQty: integer("warehouse_qty").default(0),
+  outletQty: integer("outlet_qty").default(0),
   stockAlertThreshold: integer("stock_alert_threshold").default(5),
   imageUrl: text("image_url"),
   isAvailable: boolean("is_available").default(true),

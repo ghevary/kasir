@@ -8,12 +8,20 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { MenuItem } from "@/types";
-import { Clock, CheckCircle, XCircle, Package, Send } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Package, Send, Plus, Trash2 } from "lucide-react";
+
+interface RequestItem {
+  menuItemId: string;
+  requestedQty: string;
+  notes: string;
+}
 
 export default function KasirRequestPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
-  const [form, setForm] = useState({ menuItemId: "", requestedQty: "", notes: "" });
+  const [items, setItems] = useState<RequestItem[]>([
+    { menuItemId: "", requestedQty: "", notes: "" },
+  ]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,31 +30,48 @@ export default function KasirRequestPage() {
 
   const load = async () => {
     try {
-      const [items, reqs] = await Promise.all([
+      const [menuData, reqData] = await Promise.all([
         api.getActiveMenuItems().catch(() => []),
         api.getStockRequests().catch(() => []),
       ]);
-      setMenuItems(items);
-      setRequests(reqs);
+      setMenuItems(menuData);
+      setRequests(reqData);
     } catch {} finally {
       setLoading(false);
     }
   };
 
+  const addRow = () => {
+    setItems([...items, { menuItemId: "", requestedQty: "", notes: "" }]);
+  };
+
+  const removeRow = (index: number) => {
+    if (items.length === 1) return;
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateRow = (index: number, field: keyof RequestItem, value: string) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
+  };
+
   const handleSubmit = async () => {
-    if (!form.menuItemId || !form.requestedQty) {
-      return toast.error("Item dan jumlah wajib diisi");
+    const validItems = items.filter((i) => i.menuItemId && i.requestedQty);
+    if (validItems.length === 0) {
+      return toast.error("Minimal 1 item dengan jumlah harus diisi");
     }
+
     try {
-      await api.createStockRequest([
-        {
-          menuItemId: form.menuItemId,
-          requestedQty: parseInt(form.requestedQty),
-          notes: form.notes,
-        },
-      ]);
-      toast.success("Request bahan berhasil dikirim!");
-      setForm({ menuItemId: "", requestedQty: "", notes: "" });
+      await api.createStockRequest(
+        validItems.map((i) => ({
+          menuItemId: i.menuItemId,
+          requestedQty: parseInt(i.requestedQty),
+          notes: i.notes,
+        }))
+      );
+      toast.success(`${validItems.length} item request berhasil dikirim!`);
+      setItems([{ menuItemId: "", requestedQty: "", notes: "" }]);
       load();
     } catch (err: any) {
       toast.error(err.message);
@@ -80,57 +105,92 @@ export default function KasirRequestPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Package className="w-6 h-6" /> Request Bahan</h1>
-        <p className="text-muted-foreground mt-1">Kirim permintaan bahan ke gudang</p>
+        <p className="text-muted-foreground mt-1">Kirim permintaan bahan ke gudang (bisa multi-item sekaligus)</p>
       </div>
 
-      {/* Form */}
+      {/* Multi-item Form */}
       <Card className="border-border/50">
         <CardHeader>
-          <CardTitle className="text-lg">Buat Request Baru</CardTitle>
+          <CardTitle className="text-lg">Buat Request Baru (Multi-Item)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Item Menu</label>
-              <select
-                value={form.menuItemId}
-                onChange={(e) => setForm({ ...form, menuItemId: e.target.value })}
-                className="w-full h-11 px-3 rounded-lg bg-background/50 border border-border/50 text-sm"
-              >
-                <option value="">-- Pilih Item --</option>
-                {menuItems.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name} (Stok: {i.stockQty})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Jumlah</label>
-              <Input
-                type="number"
-                value={form.requestedQty}
-                onChange={(e) => setForm({ ...form, requestedQty: e.target.value })}
-                placeholder="0"
-                className="bg-background/50"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Catatan</label>
-              <Input
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder="Opsional..."
-                className="bg-background/50"
-              />
-            </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-muted-foreground border-b border-border/50">
+                <th className="text-left py-2 px-2 font-medium">Item Menu</th>
+                <th className="text-left py-2 px-2 font-medium w-24">Stok Outlet</th>
+                <th className="text-left py-2 px-2 font-medium w-28">Jumlah</th>
+                <th className="text-left py-2 px-2 font-medium">Catatan</th>
+                <th className="text-center py-2 px-2 font-medium w-16"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, index) => {
+                const selectedItem = menuItems.find((m) => m.id === item.menuItemId);
+                return (
+                  <tr key={index} className="border-b border-border/30">
+                    <td className="py-2 px-2">
+                      <select
+                        value={item.menuItemId}
+                        onChange={(e) => updateRow(index, "menuItemId", e.target.value)}
+                        className="w-full h-10 px-3 rounded-lg bg-background/50 border border-border/50 text-sm"
+                      >
+                        <option value="">-- Pilih Item --</option>
+                        {menuItems.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      <span className={`font-medium ${(selectedItem?.outletQty || 0) <= (selectedItem?.stockAlertThreshold || 5) ? "text-red-400" : "text-emerald-400"}`}>
+                        {selectedItem ? (selectedItem.outletQty || 0) : "—"}
+                      </span>
+                    </td>
+                    <td className="py-2 px-2">
+                      <Input
+                        type="number"
+                        value={item.requestedQty}
+                        onChange={(e) => updateRow(index, "requestedQty", e.target.value)}
+                        placeholder="0"
+                        className="bg-background/50 h-10"
+                        min={1}
+                      />
+                    </td>
+                    <td className="py-2 px-2">
+                      <Input
+                        value={item.notes}
+                        onChange={(e) => updateRow(index, "notes", e.target.value)}
+                        placeholder="Opsional..."
+                        className="bg-background/50 h-10"
+                      />
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeRow(index)}
+                        disabled={items.length === 1}
+                        className="text-destructive cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={addRow} className="cursor-pointer">
+              <Plus className="w-4 h-4 mr-2" /> Tambah Baris
+            </Button>
+            <Button onClick={handleSubmit} className="bg-primary cursor-pointer">
+              <Send className="w-4 h-4 mr-2" /> Kirim Request ({items.filter((i) => i.menuItemId && i.requestedQty).length} item)
+            </Button>
           </div>
-          <Button
-            onClick={handleSubmit}
-            className="bg-primary cursor-pointer"
-          >
-            <Send className="w-4 h-4 mr-2" /> Kirim Request
-          </Button>
         </CardContent>
       </Card>
 

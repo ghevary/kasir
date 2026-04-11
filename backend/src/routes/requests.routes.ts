@@ -7,6 +7,7 @@ import { rbacMiddleware } from "../middleware/auth.middleware";
 const router = Router();
 
 // POST /api/stock-requests — create request [Kasir]
+// Supports bulk: { items: [{ menuItemId, requestedQty, notes }] }
 router.post(
   "/",
   rbacMiddleware("kasir"),
@@ -49,7 +50,6 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
-      const status = req.query.status as string;
 
       let result;
       if (user.role === "kasir") {
@@ -105,22 +105,77 @@ router.put(
       const user = (req as any).user;
       const { approvedQty } = req.body;
 
+      // Get the request first to check warehouse stock
+      const [request] = await db
+        .select()
+        .from(stockRequests)
+        .where(eq(stockRequests.id, req.params.id as string));
+
+      if (!request) {
+        res.status(404).json({ error: "Request not found" });
+        return;
+      }
+
+      const qty = approvedQty || request.requestedQty;
+
+      // Check warehouse stock
+      const [item] = await db
+        .select()
+        .from(menuItems)
+        .where(eq(menuItems.id, request.menuItemId));
+
+      if (!item) {
+        res.status(404).json({ error: "Menu item not found" });
+        return;
+      }
+
+      if ((item.warehouseQty || 0) < qty) {
+        res.status(400).json({
+          error: `Stok gudang tidak cukup. Tersedia: ${item.warehouseQty}`,
+        });
+        return;
+      }
+
+      // Update request status to approved
       const [updated] = await db
         .update(stockRequests)
         .set({
           status: "approved",
           gudangId: user.id,
-          approvedQty,
+          approvedQty: qty,
           updatedAt: new Date(),
         })
         .where(eq(stockRequests.id, req.params.id as string))
         .returning();
 
-      if (!updated) {
-        res.status(404).json({ error: "Request not found" });
-        return;
-      }
-      res.json(updated);
+      // Transfer stock: warehouse ↓, outlet ↑
+      await db
+        .update(menuItems)
+        .set({
+          warehouseQty: sql`GREATEST(${menuItems.warehouseQty} - ${qty}, 0)`,
+          outletQty: sql`${menuItems.outletQty} + ${qty}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(menuItems.id, request.menuItemId));
+
+      // Create stock out record
+      const notaNumber = `NBO-${Date.now()}`;
+      await db.insert(stockOut).values({
+        menuItemId: request.menuItemId,
+        gudangId: user.id,
+        stockRequestId: request.id,
+        qty,
+        notaNumber,
+        notes: `Approved & transferred to outlet from request`,
+      });
+
+      // Mark as fulfilled
+      await db
+        .update(stockRequests)
+        .set({ status: "fulfilled", updatedAt: new Date() })
+        .where(eq(stockRequests.id, request.id));
+
+      res.json({ ...updated, status: "fulfilled" });
     } catch (error) {
       console.error("Approve request error:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -155,68 +210,6 @@ router.put(
       res.json(updated);
     } catch (error) {
       console.error("Reject request error:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  }
-);
-
-// POST /api/stock-requests/:id/fulfill [Gudang]
-router.post(
-  "/:id/fulfill",
-  rbacMiddleware("gudang"),
-  async (req: Request, res: Response) => {
-    try {
-      const user = (req as any).user;
-
-      const [request] = await db
-        .select()
-        .from(stockRequests)
-        .where(eq(stockRequests.id, req.params.id as string));
-
-      if (!request) {
-        res.status(404).json({ error: "Request not found" });
-        return;
-      }
-
-      if (request.status !== "approved") {
-        res.status(400).json({ error: "Request must be approved first" });
-        return;
-      }
-
-      const qty = request.approvedQty || request.requestedQty;
-      const notaNumber = `NBO-${Date.now()}`;
-
-      // Create stock out record
-      const [stockOutRecord] = await db
-        .insert(stockOut)
-        .values({
-          menuItemId: request.menuItemId,
-          gudangId: user.id,
-          stockRequestId: request.id,
-          qty,
-          notaNumber,
-          notes: `Fulfilled from request ${request.id}`,
-        })
-        .returning();
-
-      // Deduct stock
-      await db
-        .update(menuItems)
-        .set({
-          stockQty: sql`GREATEST(${menuItems.stockQty} - ${qty}, 0)`,
-          updatedAt: new Date(),
-        })
-        .where(eq(menuItems.id, request.menuItemId));
-
-      // Update request status
-      await db
-        .update(stockRequests)
-        .set({ status: "fulfilled", updatedAt: new Date() })
-        .where(eq(stockRequests.id, request.id));
-
-      res.json({ stockOut: stockOutRecord, notaNumber });
-    } catch (error) {
-      console.error("Fulfill request error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   }

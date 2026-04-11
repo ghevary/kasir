@@ -285,11 +285,34 @@ select:focus-visible {
 
 /* ── Print ── */
 @media print {
-  .no-print {
+  .no-print,
+  .print\:hidden,
+  aside,
+  nav,
+  header,
+  [data-sidebar],
+  button:not(.print-btn) {
     display: none !important;
   }
   body {
-    background: white;
-    color: black;
+    background: white !important;
+    color: black !important;
+    font-size: 12px;
+  }
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+  table {
+    border-collapse: collapse;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 4px 8px;
   }
 }

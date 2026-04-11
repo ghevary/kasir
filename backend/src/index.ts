@@ -13,6 +13,8 @@ import transactionsRoutes from "./routes/transactions.routes";
 import shiftsRoutes from "./routes/shifts.routes";
 import requestsRoutes from "./routes/requests.routes";
 import reportsRoutes from "./routes/reports.routes";
+import usersRoutes from "./routes/users.routes";
+import forecastRoutes from "./routes/forecast.routes";
 
 dotenv.config();
 
@@ -43,6 +45,8 @@ app.use("/api/transactions", authMiddleware, transactionsRoutes);
 app.use("/api/shifts", authMiddleware, shiftsRoutes);
 app.use("/api/stock-requests", authMiddleware, requestsRoutes);
 app.use("/api/reports", authMiddleware, reportsRoutes);
+app.use("/api/users", authMiddleware, usersRoutes);
+app.use("/api/forecast", authMiddleware, forecastRoutes);
 
 // Global error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

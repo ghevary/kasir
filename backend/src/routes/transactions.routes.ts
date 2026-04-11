@@ -52,9 +52,9 @@ router.post(
           return;
         }
 
-        if ((menuItem.stockQty || 0) < item.qty) {
+        if ((menuItem.outletQty || 0) < item.qty) {
           res.status(400).json({
-            error: `Insufficient stock for ${menuItem.name}. Available: ${menuItem.stockQty}`,
+            error: `Stok outlet tidak cukup untuk ${menuItem.name}. Tersedia: ${menuItem.outletQty}`,
           });
           return;
         }
@@ -90,7 +90,7 @@ router.post(
         })
         .returning();
 
-      // Create transaction items & deduct stock
+      // Create transaction items & deduct outlet stock
       for (const item of itemDetails) {
         await db.insert(transactionItems).values({
           transactionId: transaction.id,
@@ -100,10 +100,11 @@ router.post(
           subtotal: item.subtotal,
         });
 
-        // Deduct stock atomically
+        // Deduct outlet stock and total stock
         await db
           .update(menuItems)
           .set({
+            outletQty: sql`GREATEST(${menuItems.outletQty} - ${item.qty}, 0)`,
             stockQty: sql`GREATEST(${menuItems.stockQty} - ${item.qty}, 0)`,
             updatedAt: new Date(),
           })

@@ -20,6 +20,8 @@ export interface MenuItem {
   description: string | null;
   price: string;
   stockQty: number;
+  warehouseQty: number;
+  outletQty: number;
   stockAlertThreshold: number;
   imageUrl: string | null;
   isAvailable: boolean;

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { ClipboardList, Coins, Banknote, Smartphone, TrendingUp, Receipt } from "lucide-react";
+import { ClipboardList, Coins, Banknote, Smartphone, TrendingUp, Receipt, Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type Tab = "penjualan" | "keuangan";
 
@@ -37,7 +38,12 @@ export default function AdminReportsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><ClipboardList className="w-6 h-6" /> Laporan</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><ClipboardList className="w-6 h-6" /> Laporan</h1>
+        <Button variant="outline" size="sm" onClick={() => window.print()} className="cursor-pointer print:hidden">
+          <Printer className="w-4 h-4 mr-1" /> Cetak Laporan
+        </Button>
+      </div>
 
       {/* Date filter */}
       <div className="flex gap-3 items-end">

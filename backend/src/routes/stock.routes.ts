@@ -6,16 +6,16 @@ import { rbacMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 
-// GET /api/stock/monitor — all items + stock [Admin]
+// GET /api/stock/monitor — all items + stock [Admin, Gudang]
 router.get(
   "/monitor",
-  rbacMiddleware("admin"),
+  rbacMiddleware("admin", "gudang"),
   async (req: Request, res: Response) => {
     try {
       const result = await db
         .select()
         .from(menuItems)
-        .orderBy(menuItems.stockQty);
+        .orderBy(menuItems.name);
       res.json(result);
     } catch (error) {
       console.error("Stock monitor error:", error);
@@ -24,7 +24,7 @@ router.get(
   }
 );
 
-// POST /api/stock/in — input barang masuk [Admin]
+// POST /api/stock/in — input barang masuk ke GUDANG [Admin]
 router.post(
   "/in",
   rbacMiddleware("admin"),
@@ -51,10 +51,11 @@ router.post(
         })
         .returning();
 
-      // Update stock_qty on menu item
+      // Update warehouse_qty (stok gudang) and stock_qty (total)
       await db
         .update(menuItems)
         .set({
+          warehouseQty: sql`${menuItems.warehouseQty} + ${qty}`,
           stockQty: sql`${menuItems.stockQty} + ${qty}`,
           updatedAt: new Date(),
         })
@@ -130,10 +131,11 @@ router.post(
         })
         .returning();
 
-      // Deduct stock
+      // Deduct warehouse stock
       await db
         .update(menuItems)
         .set({
+          warehouseQty: sql`GREATEST(${menuItems.warehouseQty} - ${qty}, 0)`,
           stockQty: sql`GREATEST(${menuItems.stockQty} - ${qty}, 0)`,
           updatedAt: new Date(),
         })
