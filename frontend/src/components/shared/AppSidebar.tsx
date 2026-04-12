@@ -30,6 +30,7 @@ import {
   Inbox,
   Upload,
   Store,
+  LogOut
 } from "lucide-react";
 
 interface NavItem {
@@ -213,28 +214,30 @@ export function AppSidebar({ role }: { role: "admin" | "kasir" | "gudang" }) {
 
       {/* User profile */}
       <div className="p-3 border-t border-border/50">
-        <DropdownMenu>
-          <DropdownMenuTrigger>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-accent/50 transition-colors">
+          <div className="w-full flex items-center justify-between px-2">
+            <div className="flex items-center gap-3 py-2.5 rounded-lg overflow-hidden">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
                   {user?.name?.charAt(0)?.toUpperCase() || "?"}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 text-left">
+              <div className="flex-1 text-left truncate">
                 <p className="text-sm font-medium truncate">{user?.name || "User"}</p>
                 <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
               </div>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Akun Saya</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer">
-              Logout
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </div>
+            
+            {/* Standalone Logout Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 cursor-pointer flex-shrink-0"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
       </div>
     </aside>
   );

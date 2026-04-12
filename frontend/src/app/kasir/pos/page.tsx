@@ -480,28 +480,11 @@ export default function KasirPOS() {
 
           <Separator />
 
-          {/* Payment Method */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPaymentMethod("cash")}
-              className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                paymentMethod === "cash"
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                  : "bg-card border border-border/50 text-muted-foreground hover:bg-accent/50"
-              }`}
-            >
-              <Banknote className="w-4 h-4 mr-2 inline" /> Cash
-            </button>
-            <button
-              onClick={() => setPaymentMethod("qris")}
-              className={`flex-1 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-                paymentMethod === "qris"
-                  ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                  : "bg-card border border-border/50 text-muted-foreground hover:bg-accent/50"
-              }`}
-            >
-              <Smartphone className="w-4 h-4 mr-2 inline" /> QRIS
-            </button>
+          {/* Cash Payment Info */}
+          <div className="flex gap-2 mb-2">
+            <div className="flex-1 py-2 text-center rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-sm font-semibold">
+              <Banknote className="w-4 h-4 mr-2 inline" /> Pembayaran Cash
+            </div>
           </div>
 
           {paymentMethod === "cash" && (

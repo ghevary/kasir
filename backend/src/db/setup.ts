@@ -189,25 +189,17 @@ export async function setupDatabase(): Promise<void> {
     await pool.query(setupSQL);
     console.log("✅ Database tables created/verified");
 
-    // Seed default users if none exist
-    const result = await pool.query("SELECT COUNT(*) FROM users");
-    const userCount = parseInt(result.rows[0].count, 10);
-
-    if (userCount === 0) {
-      console.log("🌱 Seeding default users...");
-      for (const user of defaultUsers) {
-        const passwordHash = await bcrypt.hash(user.password, 12);
-        await pool.query(
-          `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4)
-           ON CONFLICT (email) DO NOTHING`,
-          [user.name, user.email, passwordHash, user.role]
-        );
-        console.log(`  ✅ User "${user.name}" (${user.role}) created`);
-      }
-      console.log("✅ Default users seeded!");
-    } else {
-      console.log(`ℹ️  ${userCount} users already exist, skipping seed`);
+    console.log("🌱 Seeding default users (ensuring all exist)...");
+    for (const user of defaultUsers) {
+      const passwordHash = await bcrypt.hash(user.password, 12);
+      await pool.query(
+        `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (email) DO NOTHING`,
+        [user.name, user.email, passwordHash, user.role]
+      );
+      console.log(`  ✅ User "${user.name}" (${user.role}) ensured`);
     }
+    console.log("✅ Default users seeded!");
 
     console.log("🚀 Database setup complete!");
   } catch (error) {
