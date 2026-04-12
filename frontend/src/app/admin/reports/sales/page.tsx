@@ -92,20 +92,18 @@ export default function AdminReportsPage() {
         </>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4">
-            <Card className="border-border/50"><CardContent className="p-6"><p className="text-sm text-muted-foreground flex items-center gap-1"><Banknote className="w-4 h-4" /> Cash</p><p className="text-2xl font-bold mt-1 text-emerald-400">{formatRupiah(finData.summary?.totalCash || 0)}</p></CardContent></Card>
-            <Card className="border-border/50"><CardContent className="p-6"><p className="text-sm text-muted-foreground flex items-center gap-1"><Smartphone className="w-4 h-4" /> QRIS</p><p className="text-2xl font-bold mt-1 text-blue-400">{formatRupiah(finData.summary?.totalQris || 0)}</p></CardContent></Card>
-            <Card className="border-border/50"><CardContent className="p-6"><p className="text-sm text-muted-foreground flex items-center gap-1"><TrendingUp className="w-4 h-4" /> Total Revenue</p><p className="text-2xl font-bold mt-1 text-primary">{formatRupiah(finData.summary?.totalRevenue || 0)}</p></CardContent></Card>
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="border-border/50"><CardContent className="p-6"><p className="text-sm text-muted-foreground flex items-center gap-1"><Banknote className="w-4 h-4" /> Total Pendapatan Cash</p><p className="text-2xl font-bold mt-1 text-emerald-400">{formatRupiah(finData.summary?.totalCash || 0)}</p></CardContent></Card>
+            <Card className="border-border/50"><CardContent className="p-6"><p className="text-sm text-muted-foreground flex items-center gap-1"><TrendingUp className="w-4 h-4" /> Total Revenue Keseluruhan</p><p className="text-2xl font-bold mt-1 text-primary">{formatRupiah(finData.summary?.totalRevenue || 0)}</p></CardContent></Card>
           </div>
           <Card className="border-border/50"><CardContent className="p-0">
             <table className="w-full text-sm"><thead><tr className="border-b border-border/50 text-muted-foreground">
-              <th className="text-left py-3 px-4 font-medium">Tanggal</th><th className="text-right py-3 px-4 font-medium">Cash</th><th className="text-right py-3 px-4 font-medium">QRIS</th><th className="text-right py-3 px-4 font-medium">Total</th>
+              <th className="text-left py-3 px-4 font-medium">Tanggal</th><th className="text-left py-3 px-4 font-medium">Metode</th><th className="text-right py-3 px-4 font-medium">Total</th>
             </tr></thead><tbody>
               {(finData.transactions || []).map((tx: any) => (
                 <tr key={tx.id} className="border-b border-border/30 hover:bg-accent/30">
                   <td className="py-3 px-4">{new Date(tx.createdAt).toLocaleDateString("id-ID")}</td>
-                  <td className="py-3 px-4 text-right">{tx.paymentMethod === "cash" ? formatRupiah(parseFloat(tx.totalAmount)) : "—"}</td>
-                  <td className="py-3 px-4 text-right">{tx.paymentMethod === "qris" ? formatRupiah(parseFloat(tx.totalAmount)) : "—"}</td>
+                  <td className="py-3 px-4 uppercase text-emerald-500 font-semibold text-xs">{tx.paymentMethod === "cash" ? "CASH" : tx.paymentMethod}</td>
                   <td className="py-3 px-4 text-right font-semibold text-primary">{formatRupiah(parseFloat(tx.totalAmount))}</td>
                 </tr>
               ))}
