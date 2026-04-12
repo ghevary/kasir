@@ -15,7 +15,6 @@ import {
   Utensils,
   ShoppingCart,
   Banknote,
-  Smartphone,
   Trash2,
   CheckCircle,
   Printer,
@@ -37,7 +36,7 @@ export default function KasirPOS() {
   const [customerName, setCustomerName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "qris">("cash");
+  const [paymentMethod] = useState<"cash">("cash");
   const [paidAmount, setPaidAmount] = useState("");
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
   const [loading, setLoading] = useState(true);
@@ -507,12 +506,6 @@ export default function KasirPOS() {
             </div>
           )}
 
-          {paymentMethod === "qris" && (
-            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-center">
-              <Smartphone className="w-6 h-6 mx-auto text-blue-400 mb-1" />
-              <p className="text-xs text-blue-300">Pembayaran QRIS akan dicatat secara manual</p>
-            </div>
-          )}
 
           <div className="flex gap-2">
             <Button

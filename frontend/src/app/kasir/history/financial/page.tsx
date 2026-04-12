@@ -5,14 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { Transaction } from "@/types";
-import { Wallet, Banknote, Smartphone, CheckCircle, XCircle, Clock, TrendingUp } from "lucide-react";
+import { Wallet, Banknote, CheckCircle, XCircle, Clock, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
 interface FinancialReport {
   transactions: Transaction[];
   summary: {
     totalCash: number;
-    totalQris: number;
     totalRevenue: number;
     totalTransactions: number;
   };
@@ -60,7 +59,7 @@ export default function KasirHistoryFinancialPage() {
         <p className="text-muted-foreground mt-1">Ringkasan pendapatan dari semua transaksi</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-border/50 bg-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Pendapatan</CardTitle>
@@ -82,18 +81,6 @@ export default function KasirHistoryFinancialPage() {
             <div className="text-2xl font-bold text-emerald-500 flex items-center gap-2">
               <Banknote className="w-5 h-5" />
               {formatRupiah(report.summary.totalCash)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/50 bg-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pembayaran QRIS</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-              <Smartphone className="w-5 h-5" />
-              {formatRupiah(report.summary.totalQris)}
             </div>
           </CardContent>
         </Card>
@@ -135,13 +122,9 @@ export default function KasirHistoryFinancialPage() {
                     <td className="py-3 px-4">
                       <Badge
                         variant="outline"
-                        className={
-                          tx.paymentMethod === "cash"
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                            : "bg-blue-500/10 text-blue-400 border-blue-500/30"
-                        }
+                        className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                       >
-                        {tx.paymentMethod === "cash" ? <><Banknote className="w-3 h-3 mr-1 inline" /> Cash</> : <><Smartphone className="w-3 h-3 mr-1 inline" /> QRIS</>}
+                        <Banknote className="w-3 h-3 mr-1 inline" /> Cash
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-right font-semibold text-primary">

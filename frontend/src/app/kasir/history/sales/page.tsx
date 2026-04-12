@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { Transaction } from "@/types";
-import { FileText, Banknote, Smartphone, CheckCircle, XCircle, Clock } from "lucide-react";
+import { FileText, Banknote, CheckCircle, XCircle, Clock } from "lucide-react";
 
 export default function KasirHistorySalesPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -80,13 +80,9 @@ export default function KasirHistorySalesPage() {
                     <td className="py-3 px-4 text-center">
                       <Badge
                         variant="outline"
-                        className={
-                          tx.paymentMethod === "cash"
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                            : "bg-blue-500/10 text-blue-400 border-blue-500/30"
-                        }
+                        className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                       >
-                        {tx.paymentMethod === "cash" ? <><Banknote className="w-3 h-3 mr-1 inline" /> Cash</> : <><Smartphone className="w-3 h-3 mr-1 inline" /> QRIS</>}
+                        <Banknote className="w-3 h-3 mr-1 inline" /> Cash
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-center">

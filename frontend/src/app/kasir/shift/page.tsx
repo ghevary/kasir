@@ -162,8 +162,8 @@ export default function KasirShiftPage() {
                 <p className="text-lg font-semibold">{formatRupiah(shiftSummary.totalCash)}</p>
               </div>
               <div className="p-4 rounded-lg bg-accent/30">
-                <p className="text-sm text-muted-foreground">QRIS</p>
-                <p className="text-lg font-semibold">{formatRupiah(shiftSummary.totalQris)}</p>
+                <p className="text-sm text-muted-foreground">Cash Fisik</p>
+                <p className="text-lg font-semibold">{formatRupiah(shiftSummary.physicalCash || 0)}</p>
               </div>
             </div>
             {shiftSummary.difference !== undefined && (

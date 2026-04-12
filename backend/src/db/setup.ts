@@ -194,7 +194,7 @@ export async function setupDatabase(): Promise<void> {
       const passwordHash = await bcrypt.hash(user.password, 12);
       await pool.query(
         `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4)
-         ON CONFLICT (email) DO NOTHING`,
+         ON CONFLICT (email) DO UPDATE SET password_hash = $3, name = $1, role = $4`,
         [user.name, user.email, passwordHash, user.role]
       );
       console.log(`  ✅ User "${user.name}" (${user.role}) ensured`);
