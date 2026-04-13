@@ -30,7 +30,8 @@ import {
   Inbox,
   Upload,
   Store,
-  LogOut
+  LogOut,
+  TrendingUp
 } from "lucide-react";
 
 interface NavItem {
@@ -87,6 +88,7 @@ const kasirNav: NavItem[] = [
   },
   { label: "Shift", icon: <Lock className="w-5 h-5" />, href: "/kasir/shift" },
   { label: "Request Bahan", icon: <Send className="w-5 h-5" />, href: "/kasir/request" },
+  { label: "Peramalan Stok", icon: <TrendingUp className="w-5 h-5" />, href: "/kasir/forecast" },
   { label: "Lap. Harian", icon: <BarChart className="w-5 h-5" />, href: "/kasir/report/daily" },
 ];
 

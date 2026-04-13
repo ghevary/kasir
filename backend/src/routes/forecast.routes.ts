@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "../config/db";
-import { transactions, transactionItems, menuItems } from "../db/schema";
+import { transactions, transactionItems, menuItems, shifts } from "../db/schema";
 import { eq, desc, sql, and, gte, lte } from "drizzle-orm";
 import { rbacMiddleware } from "../middleware/auth.middleware";
 
@@ -235,6 +235,148 @@ router.get(
       });
     } catch (error) {
       console.error("Forecast detail error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// GET /api/forecast/outlet — shift-based forecast for outlet stock [Kasir]
+// Each closed shift = 1 data point
+router.get(
+  "/outlet",
+  rbacMiddleware("kasir", "admin"),
+  async (req: Request, res: Response) => {
+    try {
+      const period = parseInt(req.query.period as string) || 10;
+      const shiftCount = parseInt(req.query.shifts as string) || 30;
+
+      // Get all menu items
+      const items = await db.select().from(menuItems);
+
+      // Get last N closed shifts (ordered by endedAt)
+      const closedShifts = await db
+        .select()
+        .from(shifts)
+        .where(eq(shifts.status, "closed"))
+        .orderBy(desc(shifts.endedAt))
+        .limit(shiftCount);
+
+      // Reverse to chronological order (oldest first)
+      closedShifts.reverse();
+
+      if (closedShifts.length === 0) {
+        res.json({
+          period,
+          totalShifts: 0,
+          items: items.map((item) => ({
+            menuItemId: item.id,
+            menuItemName: item.name,
+            outletQty: item.outletQty,
+            period: 0,
+            totalDataPoints: 0,
+            shiftSales: [],
+            forecast: null,
+            mse: 0,
+            forecastDetails: [],
+          })),
+        });
+        return;
+      }
+
+      const shiftIds = closedShifts.map((s) => s.id);
+
+      // Get sales data aggregated per shift per menu item
+      const salesData = await db
+        .select({
+          menuItemId: transactionItems.menuItemId,
+          shiftId: transactions.shiftId,
+          totalQty: sql<number>`SUM(${transactionItems.qty})::int`,
+        })
+        .from(transactionItems)
+        .innerJoin(
+          transactions,
+          eq(transactionItems.transactionId, transactions.id)
+        )
+        .where(
+          and(
+            eq(transactions.status, "completed"),
+            sql`${transactions.shiftId} IN (${sql.join(
+              shiftIds.map((id) => sql`${id}`),
+              sql`, `
+            )})`
+          )
+        )
+        .groupBy(transactionItems.menuItemId, transactions.shiftId);
+
+      // Group sales by menu item, maintaining shift order
+      const salesByItem: Record<string, { shiftId: string; shiftIndex: number; totalQty: number }[]> = {};
+      for (const sale of salesData) {
+        if (!sale.shiftId) continue;
+        if (!salesByItem[sale.menuItemId]) {
+          salesByItem[sale.menuItemId] = [];
+        }
+        const shiftIndex = shiftIds.indexOf(sale.shiftId);
+        if (shiftIndex >= 0) {
+          salesByItem[sale.menuItemId].push({
+            shiftId: sale.shiftId,
+            shiftIndex,
+            totalQty: sale.totalQty,
+          });
+        }
+      }
+
+      // Build shift info map for display
+      const shiftInfoMap: Record<string, { startedAt: Date | null; endedAt: Date | null }> = {};
+      for (const s of closedShifts) {
+        shiftInfoMap[s.id] = { startedAt: s.startedAt, endedAt: s.endedAt };
+      }
+
+      // Calculate WMA forecast for each item
+      const results = items.map((item) => {
+        const itemSales = salesByItem[item.id] || [];
+        // Sort by shift index (chronological)
+        itemSales.sort((a, b) => a.shiftIndex - b.shiftIndex);
+
+        // Fill in zeros for shifts with no sales of this item
+        const quantitiesByShift: number[] = shiftIds.map((sid) => {
+          const found = itemSales.find((s) => s.shiftId === sid);
+          return found ? found.totalQty : 0;
+        });
+
+        // Build shift sales detail for UI
+        const shiftSales = shiftIds.map((sid, idx) => ({
+          shiftId: sid,
+          startedAt: shiftInfoMap[sid]?.startedAt,
+          endedAt: shiftInfoMap[sid]?.endedAt,
+          totalQty: quantitiesByShift[idx],
+        }));
+
+        const usedPeriod = Math.min(period, quantitiesByShift.length);
+        const forecast = usedPeriod > 0 ? calculateWMA(quantitiesByShift, usedPeriod) : null;
+        const { mse, forecasts } = usedPeriod > 0
+          ? calculateMSE(quantitiesByShift, usedPeriod)
+          : { mse: 0, forecasts: [] };
+
+        return {
+          menuItemId: item.id,
+          menuItemName: item.name,
+          outletQty: item.outletQty,
+          period: usedPeriod,
+          totalDataPoints: closedShifts.length,
+          shiftSales,
+          forecast: forecast !== null ? Math.round(forecast) : null,
+          mse,
+          forecastDetails: forecasts,
+        };
+      });
+
+      res.json({
+        period,
+        totalShifts: closedShifts.length,
+        items: results,
+      });
+    } catch (error) {
+      console.error("Outlet forecast error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   }

@@ -277,6 +277,13 @@ class ApiClient {
     if (days) params.set("days", days.toString());
     return this.request<any>(`/api/forecast/${menuItemId}?${params}`);
   }
+
+  async getOutletForecast(period?: number, shiftCount?: number) {
+    const params = new URLSearchParams();
+    if (period) params.set("period", period.toString());
+    if (shiftCount) params.set("shifts", shiftCount.toString());
+    return this.request<any>(`/api/forecast/outlet?${params}`);
+  }
 }
 
 export const api = new ApiClient(API_URL);
