@@ -121,8 +121,8 @@ router.post(
           totalQris: totalQris.toString(),
           totalRevenue: totalRevenue.toString(),
           totalTransactions,
-          physicalCash: physicalCash?.toString(),
-          notes,
+          physicalCash: physicalCash && physicalCash !== "" ? physicalCash.toString() : null,
+          notes: notes && notes !== "" ? notes : null,
           status: "closed",
         })
         .where(eq(shifts.id, activeShift.id))

@@ -151,95 +151,6 @@ router.get(
   }
 );
 
-// GET /api/forecast/:menuItemId — detail forecast for 1 item
-router.get(
-  "/:menuItemId",
-  rbacMiddleware("admin", "kasir"),
-  async (req: Request, res: Response) => {
-    try {
-      const menuItemId = req.params.menuItemId as string;
-      const period = parseInt(req.query.period as string) || 10;
-      const days = parseInt(req.query.days as string) || 30;
-
-      const [item] = await db
-        .select()
-        .from(menuItems)
-        .where(eq(menuItems.id, menuItemId));
-
-      if (!item) {
-        res.status(404).json({ error: "Menu item not found" });
-        return;
-      }
-
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const salesData = await db
-        .select({
-          date: sql<string>`DATE(${transactions.createdAt})`,
-          totalQty: sql<number>`SUM(${transactionItems.qty})::int`,
-        })
-        .from(transactionItems)
-        .innerJoin(
-          transactions,
-          eq(transactionItems.transactionId, transactions.id)
-        )
-        .where(
-          and(
-            eq(transactionItems.menuItemId, menuItemId),
-            eq(transactions.status, "completed"),
-            gte(transactions.createdAt, startDate)
-          )
-        )
-        .groupBy(sql`DATE(${transactions.createdAt})`)
-        .orderBy(sql`DATE(${transactions.createdAt})`);
-
-      const quantities = salesData.map((s) => s.totalQty);
-      const usedPeriod = Math.min(period, quantities.length);
-      const forecast = calculateWMA(quantities, usedPeriod);
-      const { mse, forecasts } = calculateMSE(quantities, usedPeriod);
-
-      // Build weights explanation
-      const weights = [];
-      if (quantities.length >= usedPeriod) {
-        const recentData = quantities.slice(-usedPeriod);
-        const recentDates = salesData.slice(-usedPeriod);
-        for (let i = 0; i < usedPeriod; i++) {
-          weights.push({
-            date: recentDates[i].date,
-            value: recentData[i],
-            weight: i + 1,
-            weighted: recentData[i] * (i + 1),
-          });
-        }
-      }
-
-      const totalWeight = (usedPeriod * (usedPeriod + 1)) / 2;
-
-      res.json({
-        menuItem: {
-          id: item.id,
-          name: item.name,
-          warehouseQty: item.warehouseQty,
-          outletQty: item.outletQty,
-        },
-        period: usedPeriod,
-        totalDataPoints: quantities.length,
-        dailySales: salesData,
-        weights,
-        totalWeight,
-        forecast: forecast !== null ? Math.round(forecast) : null,
-        forecastRaw: forecast,
-        mse,
-        forecastDetails: forecasts,
-      });
-    } catch (error) {
-      console.error("Forecast detail error:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  }
-);
-
 // GET /api/forecast/outlet — shift-based forecast for outlet stock [Kasir]
 // Each closed shift = 1 data point
 router.get(
@@ -377,6 +288,95 @@ router.get(
       });
     } catch (error) {
       console.error("Outlet forecast error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// GET /api/forecast/:menuItemId — detail forecast for 1 item
+router.get(
+  "/:menuItemId",
+  rbacMiddleware("admin", "kasir"),
+  async (req: Request, res: Response) => {
+    try {
+      const menuItemId = req.params.menuItemId as string;
+      const period = parseInt(req.query.period as string) || 10;
+      const days = parseInt(req.query.days as string) || 30;
+
+      const [item] = await db
+        .select()
+        .from(menuItems)
+        .where(eq(menuItems.id, menuItemId));
+
+      if (!item) {
+        res.status(404).json({ error: "Menu item not found" });
+        return;
+      }
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const salesData = await db
+        .select({
+          date: sql<string>`DATE(${transactions.createdAt})`,
+          totalQty: sql<number>`SUM(${transactionItems.qty})::int`,
+        })
+        .from(transactionItems)
+        .innerJoin(
+          transactions,
+          eq(transactionItems.transactionId, transactions.id)
+        )
+        .where(
+          and(
+            eq(transactionItems.menuItemId, menuItemId),
+            eq(transactions.status, "completed"),
+            gte(transactions.createdAt, startDate)
+          )
+        )
+        .groupBy(sql`DATE(${transactions.createdAt})`)
+        .orderBy(sql`DATE(${transactions.createdAt})`);
+
+      const quantities = salesData.map((s) => s.totalQty);
+      const usedPeriod = Math.min(period, quantities.length);
+      const forecast = calculateWMA(quantities, usedPeriod);
+      const { mse, forecasts } = calculateMSE(quantities, usedPeriod);
+
+      // Build weights explanation
+      const weights = [];
+      if (quantities.length >= usedPeriod) {
+        const recentData = quantities.slice(-usedPeriod);
+        const recentDates = salesData.slice(-usedPeriod);
+        for (let i = 0; i < usedPeriod; i++) {
+          weights.push({
+            date: recentDates[i].date,
+            value: recentData[i],
+            weight: i + 1,
+            weighted: recentData[i] * (i + 1),
+          });
+        }
+      }
+
+      const totalWeight = (usedPeriod * (usedPeriod + 1)) / 2;
+
+      res.json({
+        menuItem: {
+          id: item.id,
+          name: item.name,
+          warehouseQty: item.warehouseQty,
+          outletQty: item.outletQty,
+        },
+        period: usedPeriod,
+        totalDataPoints: quantities.length,
+        dailySales: salesData,
+        weights,
+        totalWeight,
+        forecast: forecast !== null ? Math.round(forecast) : null,
+        forecastRaw: forecast,
+        mse,
+        forecastDetails: forecasts,
+      });
+    } catch (error) {
+      console.error("Forecast detail error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   }

@@ -61,7 +61,6 @@ const adminNav: NavItem[] = [
       { label: "Barang Masuk", href: "/admin/stock/in" },
     ],
   },
-  { label: "Peramalan", icon: <BarChart className="w-5 h-5" />, href: "/admin/forecast" },
   { label: "Kelola Pengguna", icon: <UsersIcon className="w-5 h-5" />, href: "/admin/users" },
   {
     label: "Laporan",
