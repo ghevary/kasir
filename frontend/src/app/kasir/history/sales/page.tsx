@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { Transaction, TransactionItem } from "@/types";
 import {
@@ -16,6 +17,8 @@ import {
   ChevronUp,
   Package,
   QrCode,
+  Search,
+  CalendarDays,
 } from "lucide-react";
 
 interface TransactionWithItems extends Transaction {
@@ -28,17 +31,36 @@ export default function KasirHistorySalesPage() {
   const [expandedTx, setExpandedTx] = useState<string | null>(null);
   const [loadingItems, setLoadingItems] = useState<string | null>(null);
   const [txItems, setTxItems] = useState<Record<string, TransactionItem[]>>({});
+  const [searchDate, setSearchDate] = useState("");
+  const [activeDate, setActiveDate] = useState<string | null>(null);
+
+  const loadTransactions = async (date?: string) => {
+    setLoading(true);
+    try {
+      const result = await api.getTransactions(date);
+      setTransactions(result);
+      setActiveDate(date || null);
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setTransactions(await api.getTransactions());
-      } catch {} finally {
-        setLoading(false);
-      }
-    };
-    load();
+    // Default: load today's shift transactions
+    loadTransactions();
   }, []);
+
+  const handleSearch = () => {
+    if (searchDate) {
+      loadTransactions(searchDate);
+    }
+  };
+
+  const handleReset = () => {
+    setSearchDate("");
+    loadTransactions();
+  };
 
   const handleExpand = async (txId: string) => {
     if (expandedTx === txId) {
@@ -75,6 +97,15 @@ export default function KasirHistorySalesPage() {
       minimumFractionDigits: 0,
     }).format(amount);
 
+  const formatDisplayDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("id-ID", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -83,6 +114,13 @@ export default function KasirHistorySalesPage() {
     );
   }
 
+  const todayStr = new Date().toLocaleDateString("id-ID", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -90,9 +128,44 @@ export default function KasirHistorySalesPage() {
           <FileText className="w-6 h-6" /> Riwayat Penjualan
         </h1>
         <p className="text-muted-foreground mt-1">
-          Semua transaksi yang telah dilakukan — klik baris untuk melihat detail barang
+          Data transaksi shift hari ini — gunakan pencarian tanggal untuk melihat riwayat sebelumnya
         </p>
       </div>
+
+      {/* Date Search */}
+      <Card className="border-border/50">
+        <CardContent className="p-4">
+          <div className="flex items-end gap-3 flex-wrap">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium flex items-center gap-1.5">
+                <CalendarDays className="w-4 h-4" /> Cari Berdasarkan Tanggal
+              </label>
+              <Input
+                type="date"
+                value={searchDate}
+                onChange={(e) => setSearchDate(e.target.value)}
+                className="w-48 bg-background/50"
+              />
+            </div>
+            <Button onClick={handleSearch} disabled={!searchDate} className="cursor-pointer">
+              <Search className="w-4 h-4 mr-2" /> Cari
+            </Button>
+            {activeDate && (
+              <Button onClick={handleReset} variant="outline" className="cursor-pointer">
+                Tampilkan Hari Ini
+              </Button>
+            )}
+          </div>
+          <div className="mt-3">
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+              <CalendarDays className="w-3 h-3 mr-1 inline" />
+              {activeDate
+                ? `Menampilkan shift tanggal: ${formatDisplayDate(activeDate)}`
+                : `Menampilkan shift hari ini: ${todayStr}`}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-border/50">
         <CardContent className="p-0">
@@ -112,7 +185,9 @@ export default function KasirHistorySalesPage() {
               {transactions.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                    Belum ada transaksi
+                    {activeDate
+                      ? `Tidak ada transaksi pada tanggal ${formatDisplayDate(activeDate)}`
+                      : "Belum ada transaksi pada shift hari ini"}
                   </td>
                 </tr>
               ) : (

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -19,6 +18,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Info,
 } from "lucide-react";
 
 interface ShiftSale {
@@ -26,6 +26,16 @@ interface ShiftSale {
   startedAt: string;
   endedAt: string;
   totalQty: number;
+}
+
+interface ForecastDetail {
+  index: number;
+  actual: number;
+  forecast: number;
+  error: number;
+  absError: number;
+  squaredError: number;
+  percentError: number;
 }
 
 interface ForecastItem {
@@ -36,21 +46,30 @@ interface ForecastItem {
   totalDataPoints: number;
   shiftSales: ShiftSale[];
   forecast: number | null;
+  forecastRaw: number | null;
+  mad: number;
   mse: number;
-  forecastDetails: { actual: number; forecast: number; error: number }[];
+  mape: number;
+  forecastDetails: ForecastDetail[];
+  nextForecast: number | null;
+  conclusion: string | null;
 }
 
 interface ForecastData {
   period: number;
   totalShifts: number;
+  lookbackDays: number;
   items: ForecastItem[];
 }
+
+const WMA_PERIOD_OPTIONS = [3, 5, 7, 10];
+const LOOKBACK_DAY_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 365];
 
 export default function KasirForecastPage() {
   const [data, setData] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState(10);
-  const [shiftCount, setShiftCount] = useState(30);
+  const [period, setPeriod] = useState(7);
+  const [lookbackDays, setLookbackDays] = useState(30);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,7 +79,7 @@ export default function KasirForecastPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const result = await api.getOutletForecast(period, shiftCount);
+      const result = await api.getOutletForecast(period, lookbackDays);
       setData(result);
     } catch (err: any) {
       toast.error(err.message || "Gagal memuat data peramalan");
@@ -74,7 +93,7 @@ export default function KasirForecastPage() {
   };
 
   const formatDateTime = (dateStr: string) => {
-    if (!dateStr) return "-";
+    if (!dateStr) return "—";
     return new Date(dateStr).toLocaleString("id-ID", {
       day: "2-digit",
       month: "short",
@@ -124,27 +143,35 @@ export default function KasirForecastPage() {
           <div className="flex items-end gap-4 flex-wrap">
             <div className="space-y-2">
               <label className="text-sm font-medium">Periode WMA</label>
-              <Input
-                type="number"
+              <select
                 value={period}
-                onChange={(e) => setPeriod(parseInt(e.target.value) || 10)}
-                className="w-32 bg-background/50"
-                min={2}
-                max={30}
-              />
-              <p className="text-xs text-muted-foreground">Jumlah shift terakhir untuk bobot</p>
+                onChange={(e) => setPeriod(parseInt(e.target.value))}
+                className="flex h-9 w-40 rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+              >
+                {WMA_PERIOD_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt} shift (bobot 1-{opt})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Total bobot: {(period * (period + 1)) / 2}
+              </p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Data Historis</label>
-              <Input
-                type="number"
-                value={shiftCount}
-                onChange={(e) => setShiftCount(parseInt(e.target.value) || 30)}
-                className="w-32 bg-background/50"
-                min={5}
-                max={100}
-              />
-              <p className="text-xs text-muted-foreground">Jumlah shift yang dianalisis</p>
+              <select
+                value={lookbackDays}
+                onChange={(e) => setLookbackDays(parseInt(e.target.value))}
+                className="flex h-9 w-48 rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+              >
+                {LOOKBACK_DAY_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt} hari terakhir
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">Rentang shift yang dianalisis</p>
             </div>
             <Button onClick={load} className="bg-primary cursor-pointer">
               <BarChart3 className="w-4 h-4 mr-2" /> Hitung Peramalan
@@ -154,9 +181,15 @@ export default function KasirForecastPage() {
             <p className="text-xs text-muted-foreground">
               <strong>Keterangan:</strong> Peramalan ini menggunakan data per-shift (buka shift → tutup shift = 1 data point).
               <br />
-              <strong>Rumus WMA:</strong> Ft = (Wn × At-1 + Wn-1 × At-2 + ... + W1 × At-n) / (Wn + Wn-1 + ... + W1)
+              <strong>Rumus WMA:</strong> Ft = (W{period} × At-1 + W{period - 1} × At-2 + ... + W1 × At-{period}) / (W{period} + W{period - 1} + ... + W1)
+              <br />
+              <strong>Total Bobot:</strong> {period} + {period - 1} + ... + 1 = {(period * (period + 1)) / 2}
               <br />
               Data terbaru mendapat bobot terbesar, sehingga prediksi lebih responsif terhadap tren terkini.
+              <br />
+              <strong>MAD</strong> = Σ|Error| / n &nbsp; | &nbsp;
+              <strong>MSE</strong> = Σ(Error²) / n &nbsp; | &nbsp;
+              <strong>MAPE</strong> = (Σ(|Error|/Aktual × 100)) / n
             </p>
           </div>
         </CardContent>
@@ -168,6 +201,7 @@ export default function KasirForecastPage() {
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Periode WMA</p>
             <p className="text-2xl font-bold">{period} shift</p>
+            <p className="text-xs text-muted-foreground mt-1">Bobot: 1 - {period}</p>
           </CardContent>
         </Card>
         <Card className="border-border/50 bg-gradient-to-br from-violet-500/10 to-violet-600/5">
@@ -176,6 +210,7 @@ export default function KasirForecastPage() {
               <Clock className="w-3 h-3" /> Total Shift Dianalisis
             </p>
             <p className="text-2xl font-bold">{data?.totalShifts || 0}</p>
+            <p className="text-xs text-muted-foreground mt-1">{lookbackDays} hari terakhir</p>
           </CardContent>
         </Card>
         <Card className="border-border/50 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5">
@@ -211,7 +246,9 @@ export default function KasirForecastPage() {
                 <th className="text-center py-3 px-4 font-medium">
                   Prediksi Shift Berikutnya
                 </th>
+                <th className="text-center py-3 px-4 font-medium">MAD</th>
                 <th className="text-center py-3 px-4 font-medium">MSE</th>
+                <th className="text-center py-3 px-4 font-medium">MAPE</th>
                 <th className="text-center py-3 px-4 font-medium">Status</th>
                 <th className="text-center py-3 px-4 font-medium print:hidden">Detail</th>
               </tr>
@@ -256,9 +293,27 @@ export default function KasirForecastPage() {
                         )}
                       </td>
                       <td className="py-3 px-4 text-center">
+                        {item.mad > 0 ? (
+                          <span className="text-muted-foreground">
+                            {item.mad.toFixed(2)}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
                         {item.mse > 0 ? (
                           <span className="text-muted-foreground">
                             {item.mse.toFixed(2)}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {item.mape > 0 ? (
+                          <span className="text-muted-foreground">
+                            {item.mape.toFixed(2)}%
                           </span>
                         ) : (
                           "—"
@@ -300,11 +355,13 @@ export default function KasirForecastPage() {
                         )}
                       </td>
                     </tr>
+
                     {/* Expanded detail row */}
                     {isExpanded && hasData && (
                       <tr key={`${item.menuItemId}-detail`}>
-                        <td colSpan={7} className="p-0">
+                        <td colSpan={9} className="p-0">
                           <div className="bg-accent/20 border-y border-border/30 p-4 animate-in slide-in-from-top-2">
+                            {/* Shift Sales History */}
                             <p className="text-sm font-medium mb-3 flex items-center gap-2">
                               <Clock className="w-4 h-4" />
                               Riwayat Penjualan Per Shift (
@@ -357,53 +414,158 @@ export default function KasirForecastPage() {
                               </table>
                             </div>
 
-                            {/* WMA calculation detail */}
-                            {item.forecastDetails.length > 0 && (
+                            {/* WMA Calculation Detail Table */}
+                            {(item.forecastDetails.length > 0 || item.nextForecast !== null) && (
                               <div className="mt-4">
-                                <p className="text-sm font-medium mb-2">
-                                  Detail Perhitungan WMA (Periode {item.period})
-                                </p>
+                                <div className="flex items-start justify-between mb-2">
+                                  <p className="text-sm font-medium">
+                                    Detail Perhitungan WMA (Periode {item.period})
+                                  </p>
+                                  {/* MAD, MSE, MAPE summary - positioned top right like spreadsheet */}
+                                  <div className="text-xs border border-border/50 rounded-lg p-2.5 bg-background/50 space-y-1 min-w-[160px]">
+                                    <div className="flex justify-between gap-4">
+                                      <span className="text-muted-foreground font-medium">MAD =</span>
+                                      <span className="font-bold">{item.mad.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between gap-4">
+                                      <span className="text-muted-foreground font-medium">MSE =</span>
+                                      <span className="font-bold">{item.mse.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between gap-4">
+                                      <span className="text-muted-foreground font-medium">MAPE =</span>
+                                      <span className="font-bold">{item.mape.toFixed(2)}%</span>
+                                    </div>
+                                  </div>
+                                </div>
                                 <div className="overflow-x-auto">
                                   <table className="w-full text-xs">
                                     <thead>
                                       <tr className="text-muted-foreground border-b border-border/30">
                                         <th className="text-center py-2 px-3 font-medium">
-                                          Aktual
+                                          Data #
                                         </th>
                                         <th className="text-center py-2 px-3 font-medium">
-                                          Forecast
+                                          Penjualan
+                                        </th>
+                                        <th className="text-center py-2 px-3 font-medium">
+                                          Forecast WMA({item.period})
+                                        </th>
+                                        <th className="text-center py-2 px-3 font-medium">
+                                          Error (At-Ft)
+                                        </th>
+                                        <th className="text-center py-2 px-3 font-medium">
+                                          |Error|
                                         </th>
                                         <th className="text-center py-2 px-3 font-medium">
                                           Error²
                                         </th>
+                                        <th className="text-center py-2 px-3 font-medium">
+                                          Error (%)
+                                        </th>
                                       </tr>
                                     </thead>
                                     <tbody>
+                                      {/* Data rows before forecast starts (no forecast value) */}
+                                      {item.shiftSales.slice(0, item.period).map((sale, idx) => (
+                                        <tr
+                                          key={`pre-${idx}`}
+                                          className="border-b border-border/20"
+                                        >
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            {idx + 1}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center">
+                                            {sale.totalQty}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                        </tr>
+                                      ))}
+                                      {/* Forecast detail rows */}
                                       {item.forecastDetails.map((fd, idx) => (
                                         <tr
                                           key={idx}
                                           className="border-b border-border/20"
                                         >
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            {fd.index + 1}
+                                          </td>
                                           <td className="py-1.5 px-3 text-center">
                                             {fd.actual}
                                           </td>
                                           <td className="py-1.5 px-3 text-center text-primary">
                                             {fd.forecast.toFixed(2)}
                                           </td>
-                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                          <td className="py-1.5 px-3 text-center">
                                             {fd.error.toFixed(2)}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center">
+                                            {fd.absError.toFixed(2)}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center">
+                                            {fd.squaredError.toFixed(2)}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center">
+                                            {fd.percentError.toFixed(2)}
                                           </td>
                                         </tr>
                                       ))}
+                                      {/* LAST ROW: Next shift forecast (prediction for tomorrow) */}
+                                      {item.nextForecast !== null && (
+                                        <tr className="border-b border-border/20 bg-primary/5 font-semibold">
+                                          <td className="py-1.5 px-3 text-center text-primary">
+                                            {item.totalDataPoints + 1}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-primary font-bold">
+                                            {item.forecastRaw?.toFixed(2)}
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                          <td className="py-1.5 px-3 text-center text-muted-foreground">
+                                            —
+                                          </td>
+                                        </tr>
+                                      )}
                                     </tbody>
                                   </table>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-2">
-                                  MSE = {item.mse.toFixed(2)}
-                                </p>
+
+                                {/* Conclusion Text */}
+                                {item.conclusion && (
+                                  <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                    <p className="text-sm text-blue-300 flex items-start gap-2">
+                                      <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                      <span>{item.conclusion}</span>
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             )}
 
+                            {/* Stock recommendation */}
                             {item.forecast !== null && needsStock && (
                               <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                                 <p className="text-sm text-red-400 flex items-center gap-2">
@@ -433,8 +595,9 @@ export default function KasirForecastPage() {
         <p>Dicetak pada: {new Date().toLocaleString("id-ID")}</p>
         <p>
           Metode: Weighted Moving Average (WMA) — Periode: {period} shift —
-          Data: {data?.totalShifts || 0} shift terakhir
+          Data: {data?.totalShifts || 0} shift ({lookbackDays} hari terakhir)
         </p>
+        <p>Total Bobot: {(period * (period + 1)) / 2}</p>
         <p>Satuan data: Per-Shift (Buka Shift → Tutup Shift = 1 Data Point)</p>
       </div>
     </div>

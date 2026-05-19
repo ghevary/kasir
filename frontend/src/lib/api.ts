@@ -143,8 +143,11 @@ class ApiClient {
     });
   }
 
-  async getTransactions() {
-    return this.request<any[]>("/api/transactions");
+  async getTransactions(date?: string) {
+    const params = new URLSearchParams();
+    if (date) params.set("date", date);
+    const query = params.toString() ? `?${params}` : "";
+    return this.request<any[]>(`/api/transactions${query}`);
   }
 
   async getTransaction(id: string) {
@@ -211,10 +214,16 @@ class ApiClient {
     return this.request<any>(`/api/reports/sales?${params}`);
   }
 
-  async getFinancialReport(from?: string, to?: string) {
+  async getFinancialReport(fromOrDate?: string, to?: string) {
     const params = new URLSearchParams();
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
+    if (fromOrDate && to) {
+      // Range mode (admin)
+      params.set("from", fromOrDate);
+      params.set("to", to);
+    } else if (fromOrDate) {
+      // Single date mode (kasir)
+      params.set("date", fromOrDate);
+    }
     return this.request<any>(`/api/reports/financial?${params}`);
   }
 
@@ -278,10 +287,10 @@ class ApiClient {
     return this.request<any>(`/api/forecast/${menuItemId}?${params}`);
   }
 
-  async getOutletForecast(period?: number, shiftCount?: number) {
+  async getOutletForecast(period?: number, lookbackDays?: number) {
     const params = new URLSearchParams();
     if (period) params.set("period", period.toString());
-    if (shiftCount) params.set("shifts", shiftCount.toString());
+    if (lookbackDays) params.set("days", lookbackDays.toString());
     return this.request<any>(`/api/forecast/outlet?${params}`);
   }
 }

@@ -14,8 +14,11 @@ const router = Router();
  * Formula: Ft = (Wn × At-1 + Wn-1 × At-2 + ... + W1 × At-n) / (Wn + Wn-1 + ... + W1)
  * - Data terbaru mendapat bobot terbesar
  * - Bobot: 1 (terlama) sampai n (terbaru)
+ * - Total bobot = n(n+1)/2
  *
+ * MAD = Σ|Error| / n
  * MSE = Σ(Error²) / n
+ * MAPE = (Σ(|Error|/Aktual × 100)) / n
  */
 
 interface DailySales {
@@ -28,45 +31,72 @@ function calculateWMA(data: number[], period: number): number | null {
 
   const recentData = data.slice(-period);
   let weightedSum = 0;
-  let totalWeight = 0;
+  const totalWeight = (period * (period + 1)) / 2; // n(n+1)/2
 
   for (let i = 0; i < period; i++) {
     const weight = i + 1; // 1 (oldest) to period (newest)
     weightedSum += recentData[i] * weight;
-    totalWeight += weight;
   }
 
   return Math.round((weightedSum / totalWeight) * 100) / 100;
 }
 
-function calculateMSE(
+interface ForecastDetail {
+  index: number;
+  actual: number;
+  forecast: number;
+  error: number;        // At - Ft
+  absError: number;     // |Error|
+  squaredError: number;  // Error²
+  percentError: number;  // |Error|/Aktual × 100
+}
+
+function calculateErrorMetrics(
   actualData: number[],
   period: number
-): { mse: number; forecasts: { actual: number; forecast: number; error: number }[] } {
-  const forecasts: { actual: number; forecast: number; error: number }[] = [];
+): {
+  mad: number;
+  mse: number;
+  mape: number;
+  forecasts: ForecastDetail[];
+} {
+  const forecasts: ForecastDetail[] = [];
 
   for (let i = period; i < actualData.length; i++) {
     const dataForForecast = actualData.slice(0, i);
     const forecast = calculateWMA(dataForForecast, period);
     if (forecast !== null) {
-      const error = Math.pow(actualData[i] - forecast, 2);
+      const error = actualData[i] - forecast; // At - Ft
+      const absError = Math.abs(error);
+      const squaredError = error * error;
+      const percentError = actualData[i] !== 0
+        ? (absError / actualData[i]) * 100
+        : 0;
+
       forecasts.push({
+        index: i,
         actual: actualData[i],
-        forecast,
-        error,
+        forecast: Math.round(forecast * 100) / 100,
+        error: Math.round(error * 100) / 100,
+        absError: Math.round(absError * 100) / 100,
+        squaredError: Math.round(squaredError * 100) / 100,
+        percentError: Math.round(percentError * 100) / 100,
       });
     }
   }
 
-  const mse =
-    forecasts.length > 0
-      ? Math.round(
-          (forecasts.reduce((sum, f) => sum + f.error, 0) / forecasts.length) *
-            100
-        ) / 100
-      : 0;
+  const n = forecasts.length;
+  const mad = n > 0
+    ? Math.round((forecasts.reduce((sum, f) => sum + f.absError, 0) / n) * 100) / 100
+    : 0;
+  const mse = n > 0
+    ? Math.round((forecasts.reduce((sum, f) => sum + f.squaredError, 0) / n) * 100) / 100
+    : 0;
+  const mape = n > 0
+    ? Math.round((forecasts.reduce((sum, f) => sum + f.percentError, 0) / n) * 100) / 100
+    : 0;
 
-  return { mse, forecasts };
+  return { mad, mse, mape, forecasts };
 }
 
 // GET /api/forecast — forecast for all menu items
@@ -123,7 +153,7 @@ router.get(
         const quantities = itemSales.map((s) => s.totalQty);
 
         const forecast = calculateWMA(quantities, Math.min(period, quantities.length));
-        const { mse, forecasts } = calculateMSE(quantities, Math.min(period, quantities.length));
+        const { mse, mad, mape, forecasts } = calculateErrorMetrics(quantities, Math.min(period, quantities.length));
 
         return {
           menuItemId: item.id,
@@ -134,7 +164,9 @@ router.get(
           totalDataPoints: quantities.length,
           dailySales: itemSales,
           forecast: forecast !== null ? Math.round(forecast) : null,
+          mad,
           mse,
+          mape,
           forecastDetails: forecasts,
         };
       });
@@ -158,19 +190,26 @@ router.get(
   rbacMiddleware("kasir", "admin"),
   async (req: Request, res: Response) => {
     try {
-      const period = parseInt(req.query.period as string) || 10;
-      const shiftCount = parseInt(req.query.shifts as string) || 30;
+      const period = parseInt(req.query.period as string) || 7;
+      const lookbackDays = parseInt(req.query.days as string) || 30;
 
       // Get all menu items
       const items = await db.select().from(menuItems);
 
-      // Get last N closed shifts (ordered by endedAt)
+      // Get closed shifts within the lookback period
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - lookbackDays);
+
       const closedShifts = await db
         .select()
         .from(shifts)
-        .where(eq(shifts.status, "closed"))
-        .orderBy(desc(shifts.endedAt))
-        .limit(shiftCount);
+        .where(
+          and(
+            eq(shifts.status, "closed"),
+            gte(shifts.startedAt, startDate)
+          )
+        )
+        .orderBy(desc(shifts.endedAt));
 
       // Reverse to chronological order (oldest first)
       closedShifts.reverse();
@@ -179,6 +218,7 @@ router.get(
         res.json({
           period,
           totalShifts: 0,
+          lookbackDays,
           items: items.map((item) => ({
             menuItemId: item.id,
             menuItemName: item.name,
@@ -187,8 +227,13 @@ router.get(
             totalDataPoints: 0,
             shiftSales: [],
             forecast: null,
+            forecastRaw: null,
+            mad: 0,
             mse: 0,
+            mape: 0,
             forecastDetails: [],
+            nextForecast: null,
+            conclusion: null,
           })),
         });
         return;
@@ -264,9 +309,19 @@ router.get(
 
         const usedPeriod = Math.min(period, quantitiesByShift.length);
         const forecast = usedPeriod > 0 ? calculateWMA(quantitiesByShift, usedPeriod) : null;
-        const { mse, forecasts } = usedPeriod > 0
-          ? calculateMSE(quantitiesByShift, usedPeriod)
-          : { mse: 0, forecasts: [] };
+        const { mad, mse, mape, forecasts } = usedPeriod > 0
+          ? calculateErrorMetrics(quantitiesByShift, usedPeriod)
+          : { mad: 0, mse: 0, mape: 0, forecasts: [] };
+
+        // Next forecast (prediction for the next shift — the last row in the table)
+        const nextForecast = forecast !== null ? Math.round(forecast) : null;
+
+        // Build conclusion text
+        const totalSamples = quantitiesByShift.length;
+        let conclusion: string | null = null;
+        if (nextForecast !== null) {
+          conclusion = `Sehingga hasil analisa metode Weighted Moving Average, yang menggunakan (${totalSamples}) sampel data dan nilai bobot (${usedPeriod}), memiliki hasil forecast ${forecast} pada data ke-(${totalSamples + 1}). Sehingga dapat disimpulkan jumlah penjualan ${item.name} pada shift yang akan datang yaitu ${nextForecast} pcs.`;
+        }
 
         return {
           menuItemId: item.id,
@@ -275,15 +330,21 @@ router.get(
           period: usedPeriod,
           totalDataPoints: closedShifts.length,
           shiftSales,
-          forecast: forecast !== null ? Math.round(forecast) : null,
+          forecast: nextForecast,
+          forecastRaw: forecast,
+          mad,
           mse,
+          mape,
           forecastDetails: forecasts,
+          nextForecast,
+          conclusion,
         };
       });
 
       res.json({
         period,
         totalShifts: closedShifts.length,
+        lookbackDays,
         items: results,
       });
     } catch (error) {
@@ -339,7 +400,7 @@ router.get(
       const quantities = salesData.map((s) => s.totalQty);
       const usedPeriod = Math.min(period, quantities.length);
       const forecast = calculateWMA(quantities, usedPeriod);
-      const { mse, forecasts } = calculateMSE(quantities, usedPeriod);
+      const { mad, mse, mape, forecasts } = calculateErrorMetrics(quantities, usedPeriod);
 
       // Build weights explanation
       const weights = [];
@@ -372,7 +433,9 @@ router.get(
         totalWeight,
         forecast: forecast !== null ? Math.round(forecast) : null,
         forecastRaw: forecast,
+        mad,
         mse,
+        mape,
         forecastDetails: forecasts,
       });
     } catch (error) {

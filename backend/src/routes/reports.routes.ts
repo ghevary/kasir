@@ -6,6 +6,7 @@ import {
   menuItems,
   stockIn,
   stockOut,
+  shifts,
 } from "../db/schema";
 import { eq, desc, sql, and, gte, lte } from "drizzle-orm";
 import { rbacMiddleware } from "../middleware/auth.middleware";
@@ -50,41 +51,121 @@ router.get(
 );
 
 // GET /api/reports/financial
+// Default: returns financial data from today's shifts only
+// Query ?date=YYYY-MM-DD: returns financial data from shifts on that date
+// Query ?from=&to=: legacy range filter (for admin reports page)
 router.get(
   "/financial",
   rbacMiddleware("admin", "kasir"),
   async (req: Request, res: Response) => {
     try {
-      const { from, to } = req.query;
-      let conditions: any[] = [eq(transactions.status, "completed")];
+      const { from, to, date } = req.query;
+      let result: any[];
 
-      if (from) conditions.push(gte(transactions.createdAt, new Date(from as string)));
-      if (to) conditions.push(lte(transactions.createdAt, new Date(to as string)));
+      if (date || (!from && !to)) {
+        // Shift-based filter: default today or specific date
+        const targetDate = date ? new Date(date as string) : new Date();
+        const startOfDay = new Date(targetDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(targetDate);
+        endOfDay.setHours(23, 59, 59, 999);
 
-      const result = await db
-        .select()
-        .from(transactions)
-        .where(and(...conditions))
-        .orderBy(desc(transactions.createdAt));
+        // Find shifts that started on the target date
+        const dayShifts = await db
+          .select()
+          .from(shifts)
+          .where(
+            and(
+              gte(shifts.startedAt, startOfDay),
+              lte(shifts.startedAt, endOfDay)
+            )
+          );
 
-      let totalCash = 0;
-      let totalQris = 0;
+        if (dayShifts.length === 0) {
+          res.json({
+            transactions: [],
+            shifts: [],
+            summary: {
+              totalCash: 0,
+              totalQris: 0,
+              totalRevenue: 0,
+              totalTransactions: 0,
+            },
+          });
+          return;
+        }
 
-      result.forEach((t) => {
-        const amount = parseFloat(t.totalAmount);
-        if (t.paymentMethod === "cash") totalCash += amount;
-        else totalQris += amount;
-      });
+        const shiftIds = dayShifts.map((s) => s.id);
 
-      res.json({
-        transactions: result,
-        summary: {
-          totalCash,
-          totalQris,
-          totalRevenue: totalCash + totalQris,
-          totalTransactions: result.length,
-        },
-      });
+        result = await db
+          .select()
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.status, "completed"),
+              sql`${transactions.shiftId} IN (${sql.join(
+                shiftIds.map((id) => sql`${id}`),
+                sql`, `
+              )})`
+            )
+          )
+          .orderBy(desc(transactions.createdAt));
+
+        let totalCash = 0;
+        let totalQris = 0;
+
+        result.forEach((t) => {
+          const amount = parseFloat(t.totalAmount);
+          if (t.paymentMethod === "cash") totalCash += amount;
+          else totalQris += amount;
+        });
+
+        res.json({
+          transactions: result,
+          shifts: dayShifts.map((s) => ({
+            id: s.id,
+            startedAt: s.startedAt,
+            endedAt: s.endedAt,
+            status: s.status,
+          })),
+          summary: {
+            totalCash,
+            totalQris,
+            totalRevenue: totalCash + totalQris,
+            totalTransactions: result.length,
+          },
+        });
+      } else {
+        // Legacy from/to range filter (for admin)
+        let conditions: any[] = [eq(transactions.status, "completed")];
+        if (from) conditions.push(gte(transactions.createdAt, new Date(from as string)));
+        if (to) conditions.push(lte(transactions.createdAt, new Date(to as string)));
+
+        result = await db
+          .select()
+          .from(transactions)
+          .where(and(...conditions))
+          .orderBy(desc(transactions.createdAt));
+
+        let totalCash = 0;
+        let totalQris = 0;
+
+        result.forEach((t) => {
+          const amount = parseFloat(t.totalAmount);
+          if (t.paymentMethod === "cash") totalCash += amount;
+          else totalQris += amount;
+        });
+
+        res.json({
+          transactions: result,
+          summary: {
+            totalCash,
+            totalQris,
+            totalRevenue: totalCash + totalQris,
+            totalTransactions: result.length,
+          },
+        });
+      }
     } catch (error) {
       console.error("Financial report error:", error);
       res.status(500).json({ error: "Internal server error" });

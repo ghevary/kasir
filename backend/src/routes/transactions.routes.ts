@@ -123,12 +123,53 @@ router.post(
 );
 
 // GET /api/transactions
+// Default: returns transactions from today's shifts only
+// Query ?date=YYYY-MM-DD: returns transactions from shifts on that date
 router.get(
   "/",
   rbacMiddleware("kasir", "admin"),
   async (req: Request, res: Response) => {
     try {
-      const result = await db.select().from(transactions).orderBy(desc(transactions.createdAt));
+      const user = (req as any).user;
+      const dateParam = req.query.date as string | undefined;
+
+      // Determine the target date
+      const targetDate = dateParam ? new Date(dateParam) : new Date();
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Find shifts that started on the target date
+      const dayShifts = await db
+        .select()
+        .from(shifts)
+        .where(
+          and(
+            gte(shifts.startedAt, startOfDay),
+            lte(shifts.startedAt, endOfDay)
+          )
+        );
+
+      if (dayShifts.length === 0) {
+        res.json([]);
+        return;
+      }
+
+      const shiftIds = dayShifts.map((s) => s.id);
+
+      // Get transactions from those shifts
+      const result = await db
+        .select()
+        .from(transactions)
+        .where(
+          sql`${transactions.shiftId} IN (${sql.join(
+            shiftIds.map((id) => sql`${id}`),
+            sql`, `
+          )})`
+        )
+        .orderBy(desc(transactions.createdAt));
+
       res.json(result);
     } catch (error) {
       console.error("Get transactions error:", error);
