@@ -75,18 +75,18 @@ async function seed() {
     // 2. Ensure category exists
     const catResult = await pool.query(
       `INSERT INTO categories (name, description)
-       VALUES ('Minuman', 'Kategori minuman')
+       VALUES ('Super Popular', 'Menu paling populer dan laris')
        ON CONFLICT DO NOTHING
        RETURNING id`
     );
     let categoryId: string;
     if (catResult.rows.length > 0) {
       categoryId = catResult.rows[0].id;
-      console.log(`✅ Created category 'Minuman': ${categoryId}`);
+      console.log(`✅ Created category 'Super Popular': ${categoryId}`);
     } else {
-      const existing = await pool.query(`SELECT id FROM categories WHERE name = 'Minuman' LIMIT 1`);
+      const existing = await pool.query(`SELECT id FROM categories WHERE name = 'Super Popular' LIMIT 1`);
       categoryId = existing.rows[0].id;
-      console.log(`✅ Using existing category 'Minuman': ${categoryId}`);
+      console.log(`✅ Using existing category 'Super Popular': ${categoryId}`);
     }
 
     // 3. Create menu item "Extra Avocado"
