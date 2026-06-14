@@ -202,10 +202,93 @@ export async function setupDatabase(): Promise<void> {
     console.log("✅ Default users seeded!");
 
     console.log("🚀 Database setup complete!");
+
+    // ── Auto-seed Extra Avocado (WMA forecast data) ──────────────
+    await seedExtraAvocado(pool);
+
   } catch (error) {
     console.error("❌ Database setup failed:", error);
     throw error;
   } finally {
     await pool.end();
   }
+}
+
+async function seedExtraAvocado(pool: Pool): Promise<void> {
+  // Guard: skip jika data sudah ada
+  const check = await pool.query(`SELECT id FROM menu_items WHERE name = 'Extra Avocado' LIMIT 1`);
+  if (check.rows.length > 0) {
+    console.log("⏭️  Extra Avocado sudah ada, skip seeding.");
+    return;
+  }
+
+  console.log("🌱 Seeding data Extra Avocado...");
+
+  const SALES_DATA = [
+    { date: "2025-01-01", qty: 44 }, { date: "2025-01-02", qty: 41 },
+    { date: "2025-01-03", qty: 42 }, { date: "2025-01-04", qty: 44 },
+    { date: "2025-01-05", qty: 35 }, { date: "2025-01-06", qty: 38 },
+    { date: "2025-01-07", qty: 44 }, { date: "2025-01-08", qty: 38 },
+    { date: "2025-01-09", qty: 42 }, { date: "2025-01-10", qty: 41 },
+    { date: "2025-01-11", qty: 36 }, { date: "2025-01-12", qty: 42 },
+    { date: "2025-01-13", qty: 43 }, { date: "2025-01-14", qty: 43 },
+    { date: "2025-01-15", qty: 40 }, { date: "2025-01-16", qty: 37 },
+    { date: "2025-01-17", qty: 41 }, { date: "2025-01-18", qty: 40 },
+    { date: "2025-01-19", qty: 37 }, { date: "2025-01-20", qty: 43 },
+    { date: "2025-01-21", qty: 44 }, { date: "2025-01-22", qty: 40 },
+    { date: "2025-01-23", qty: 40 }, { date: "2025-01-24", qty: 40 },
+    { date: "2025-01-25", qty: 38 }, { date: "2025-01-26", qty: 45 },
+    { date: "2025-01-27", qty: 35 }, { date: "2025-01-28", qty: 44 },
+    { date: "2025-01-29", qty: 42 }, { date: "2025-01-30", qty: 39 },
+    { date: "2025-01-31", qty: 44 }, { date: "2025-02-01", qty: 37 },
+    { date: "2025-02-02", qty: 35 }, { date: "2025-02-03", qty: 45 },
+  ];
+  const ITEM_PRICE = 8000;
+
+  // 1. Kasir
+  const kasirResult = await pool.query(`SELECT id FROM users WHERE role = 'kasir' LIMIT 1`);
+  if (kasirResult.rows.length === 0) { console.warn("⚠️  Kasir not found, skip seed."); return; }
+  const kasirId = kasirResult.rows[0].id;
+
+  // 2. Kategori Super Popular
+  await pool.query(`INSERT INTO categories (name, description) VALUES ('Super Popular', 'Menu paling populer dan laris') ON CONFLICT DO NOTHING`);
+  const catResult = await pool.query(`SELECT id FROM categories WHERE name = 'Super Popular' LIMIT 1`);
+  const categoryId = catResult.rows[0].id;
+
+  // 3. Menu item
+  const itemResult = await pool.query(
+    `INSERT INTO menu_items (category_id, name, description, price, stock_qty, warehouse_qty, outlet_qty, is_available)
+     VALUES ($1, 'Extra Avocado', 'Extra Avocado topping', $2, 500, 300, 200, true) RETURNING id`,
+    [categoryId, ITEM_PRICE.toFixed(2)]
+  );
+  const menuItemId = itemResult.rows[0].id;
+
+  // 4. Shifts + transactions
+  for (const day of SALES_DATA) {
+    const shiftStart = new Date(`${day.date}T08:00:00+07:00`);
+    const shiftEnd   = new Date(`${day.date}T17:00:00+07:00`);
+    const totalAmount = day.qty * ITEM_PRICE;
+
+    const shiftResult = await pool.query(
+      `INSERT INTO shifts (kasir_id, started_at, ended_at, total_cash, total_revenue, total_transactions, status)
+       VALUES ($1, $2, $3, $4, $4, 1, 'closed') RETURNING id`,
+      [kasirId, shiftStart, shiftEnd, totalAmount.toFixed(2)]
+    );
+    const shiftId = shiftResult.rows[0].id;
+
+    const txResult = await pool.query(
+      `INSERT INTO transactions (kasir_id, shift_id, total_amount, paid_amount, payment_method, status, created_at)
+       VALUES ($1, $2, $3, $3, 'cash', 'completed', $4) RETURNING id`,
+      [kasirId, shiftId, totalAmount.toFixed(2), shiftStart]
+    );
+    const txId = txResult.rows[0].id;
+
+    await pool.query(
+      `INSERT INTO transaction_items (transaction_id, menu_item_id, qty, unit_price, subtotal)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [txId, menuItemId, day.qty, ITEM_PRICE.toFixed(2), totalAmount.toFixed(2)]
+    );
+  }
+
+  console.log(`✅ Extra Avocado seeded! 34 hari data historis berhasil dimasukkan.`);
 }
